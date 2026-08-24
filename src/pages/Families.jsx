@@ -1,199 +1,178 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../lib/api.js';
 import {
-  PageHeader, Table, Badge, Pagination, Modal, ErrorBox,
-  useToast, money, date, dateTime,
+  PageHeader, Table, Badge, Modal, Field, Avatar, Pagination,
+  useToast, ErrorBox, money, date,
 } from '../components/ui.jsx';
+import { IconSearch, IconEye } from '../components/icons.jsx';
+
+const STATUS_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'blocked', label: 'Suspended' },
+];
 
 export default function Families() {
+  const { toast, notify, error: toastError } = useToast();
+  const [data, setData] = useState({ items: [], total: 0, pages: 0 });
   const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
-  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
-  const { toast, notify, error: notifyError } = useToast();
 
-  const load = useCallback(() => {
+  const load = () => {
     setLoading(true);
-    setError('');
-    api('/families', { params: { search, page, limit: 20 } })
+    const qs = new URLSearchParams({ page, limit: 25 });
+    if (search.trim()) qs.set('search', search.trim());
+    api(`/families?${qs}`)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [search, page]);
-
-  useEffect(load, [load]);
-
-  const openDetail = async (row) => {
-    setSelected(row);
-    setDetail(null);
-    try {
-      setDetail(await api(`/families/${row._id}`));
-    } catch (e) {
-      notifyError(e.message);
-    }
   };
 
-  const act = async (path, body, message) => {
+  useEffect(() => {
+    const t = setTimeout(load, search ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [search, page]);
+
+  const open = (f) => {
+    setSelected(f);
+    setDetail(null);
+    api(`/families/${f._id}`).then(setDetail).catch(() => setDetail({ family: f }));
+  };
+
+  const toggleBlock = async () => {
     try {
-      await api(path, { method: 'POST', body });
-      notify(message);
+      await api(`/families/${selected._id}/block`, {
+        method: 'POST',
+        body: { blocked: !selected.blocked },
+      });
+      notify(`${selected.fullName} ${selected.blocked ? 'unblocked' : 'blocked'}.`);
       setSelected(null);
       load();
     } catch (e) {
-      notifyError(e.message);
+      toastError(e.message);
     }
   };
 
+  const rows = status
+    ? (data.items || []).filter((f) => (status === 'blocked' ? f.blocked : !f.blocked))
+    : data.items || [];
+
+  const active = (data.items || []).filter((f) => !f.blocked).length;
+
   const columns = [
-    { key: 'fullName', header: 'Name', render: (r) => (
-      <div>
-        <p className="font-medium text-slate-900">{r.fullName || '—'}</p>
-        <p className="text-xs text-slate-500">{r.phone}</p>
-      </div>
-    ) },
-    { key: 'email', header: 'Email', render: (r) => (
-      <span>{r.email || '—'} {r.emailVerified ? '✅' : ''}</span>
-    ) },
-    { key: 'idVerified', header: 'ID', render: (r) =>
-      r.idVerified ? <Badge value="verified">Verified</Badge> : <Badge value="pending_verification">Pending</Badge> },
-    { key: 'children', header: 'Children', render: (r) => (r.children || []).length },
-    { key: 'addresses', header: 'Addresses', render: (r) => (r.addresses || []).length },
-    { key: 'blocked', header: 'Status', render: (r) =>
-      r.blocked ? <Badge value="suspended">Blocked</Badge> : <Badge value="verified">Active</Badge> },
-    { key: 'createdAt', header: 'Joined', render: (r) => date(r.createdAt) },
+    {
+      key: 'id', header: 'Family ID',
+      render: (f) => <span className="font-mono text-xs text-slate-500">F-{String(f._id).slice(-4).toUpperCase()}</span>,
+    },
+    {
+      key: 'name', header: 'Name',
+      render: (f) => (
+        <span className="flex items-center gap-2.5">
+          <Avatar name={f.fullName} />
+          <span className="font-medium text-slate-100">{f.fullName || '—'}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'email', header: 'Email',
+      render: (f) => (
+        <span className="block max-w-[170px] truncate font-mono text-xs text-slate-400" title={f.email}>
+          {f.email || '—'}
+        </span>
+      ),
+    },
+    { key: 'phone', header: 'Phone', render: (f) => <span className="font-mono text-xs text-slate-400">{f.phone}</span> },
+    {
+      key: 'location', header: 'Location',
+      render: (f) => (
+        <span className="block max-w-[130px] truncate text-slate-400">
+          {f.addresses?.[0]?.addressLine || f.addresses?.[0]?.label || '—'}
+        </span>
+      ),
+    },
+    { key: 'total', header: 'Total Bk.', render: (f) => <span className="font-mono text-xs">{f.stats?.total ?? 0}</span> },
+    {
+      key: 'active', header: 'Active',
+      render: (f) => <span className="font-mono text-xs text-brand-400">{f.stats?.active ?? 0}</span>,
+    },
+    {
+      key: 'completed', header: 'Completed',
+      render: (f) => <span className="font-mono text-xs text-emerald-400">{f.stats?.completed ?? 0}</span>,
+    },
+    {
+      key: 'cancelled', header: 'Cancelled',
+      render: (f) => <span className="font-mono text-xs text-slate-400">{f.stats?.cancelled ?? 0}</span>,
+    },
+    {
+      key: 'spent', header: 'Total Spent',
+      render: (f) => <span className="font-mono text-xs">{money(f.stats?.spent)}</span>,
+    },
+    {
+      key: 'tickets', header: 'Tickets',
+      render: (f) => (
+        <span className={`font-mono text-xs ${f.stats?.tickets ? 'text-red-400' : 'text-slate-500'}`}>
+          {f.stats?.tickets ?? 0}
+        </span>
+      ),
+    },
+    { key: 'referrals', header: 'Referrals', render: (f) => <span className="font-mono text-xs">{f.referralCount || 0}</span> },
+    { key: 'status', header: 'Status', render: (f) => <Badge value={f.blocked ? 'suspended' : 'active'} /> },
+    {
+      key: 'view', header: '',
+      render: (f) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); open(f); }}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-400 hover:text-brand-300"
+        >
+          <IconEye size={14} /> View
+        </button>
+      ),
+    },
   ];
+
+  if (error) return <ErrorBox error={error} onRetry={load} />;
 
   return (
     <>
-      <PageHeader title="Families" subtitle="Customer accounts, children and booking history" />
+      <PageHeader title="Families" subtitle={`${data.total} accounts · ${active} active`} />
 
-      <input
-        className="input max-w-sm mb-4"
-        placeholder="Search by name, email or phone…"
-        value={search}
-        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-      />
+      <div className="flex flex-wrap gap-3 mb-5">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+            <IconSearch size={15} />
+          </span>
+          <input
+            className="input pl-9"
+            placeholder="Search families..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+        <select className="input w-auto min-w-[150px]" value={status} onChange={(e) => setStatus(e.target.value)}>
+          {STATUS_FILTERS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
 
-      <ErrorBox error={error} onRetry={load} />
-      {!error && (
-        <>
-          <Table columns={columns} rows={data?.items} loading={loading}
-            onRowClick={openDetail} empty="No families found." />
-          <Pagination page={data?.page} pages={data?.pages} total={data?.total} onChange={setPage} />
-        </>
-      )}
+      <Table columns={columns} rows={rows} loading={loading} onRowClick={open} dense empty="No families yet." />
+      <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
 
       <Modal
-        open={!!selected}
+        open={Boolean(selected)}
         title={selected?.fullName || 'Family'}
         onClose={() => setSelected(null)}
-        footer={selected && (
-          <>
-            <button className="btn-ghost"
-              onClick={() => act(`/families/${selected._id}/verify-id`, { verified: !selected.idVerified },
-                selected.idVerified ? 'ID marked unverified.' : 'ID verified.')}>
-              {selected.idVerified ? 'Unverify ID' : '✅ Verify ID'}
-            </button>
-            <button className={selected.blocked ? 'btn-ghost' : 'btn-danger'}
-              onClick={() => act(`/families/${selected._id}/block`, { blocked: !selected.blocked },
-                selected.blocked ? 'Family unblocked.' : 'Family blocked.')}>
-              {selected.blocked ? 'Unblock' : 'Block'}
-            </button>
-          </>
-        )}
+        wide
+        footer={
+          <button className={selected?.blocked ? 'btn-primary' : 'btn-danger'} onClick={toggleBlock}>
+            {selected?.blocked ? 'Unblock account' : 'Block account'}
+          </button>
+        }
       >
-        {selected && (
-          <div className="space-y-4 text-sm">
-            <dl className="grid grid-cols-2 gap-3">
-              <Field label="Name" value={selected.fullName || '—'} />
-              <Field label="Phone" value={selected.phone} />
-              <Field label="Email" value={`${selected.email || '—'} ${selected.emailVerified ? '✅' : ''}`} />
-              <Field label="ID verified" value={selected.idVerified ? 'Yes ✅' : 'No'} />
-              <Field label="Referral code" value={selected.referralCode || '—'} />
-              <Field label="Referrals" value={selected.referralCount || 0} />
-            </dl>
-
-            {selected.addresses?.length > 0 && (
-              <Section title="Saved addresses">
-                <ul className="space-y-1 mt-1">
-                  {selected.addresses.map((a) => (
-                    <li key={a._id} className="text-xs">
-                      <span className="font-medium text-slate-800">{a.label}</span> — {a.addressLine}
-                      {a.mapUrl && (
-                        <a href={a.mapUrl} target="_blank" rel="noreferrer"
-                          className="ml-1 text-brand-600 hover:underline">📍</a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </Section>
-            )}
-
-            {selected.children?.length > 0 && (
-              <Section title={`Children (${selected.children.length})`}>
-                <ul className="space-y-1.5 mt-1">
-                  {selected.children.map((c) => (
-                    <li key={c._id} className="text-xs">
-                      <span className="font-medium text-slate-800">{c.name} — {c.age}</span>
-                      {c.medicalNotes && <span className="block text-amber-700">⚠️ {c.medicalNotes}</span>}
-                      {c.dietaryNotes && <span className="block text-slate-500">🍽 {c.dietaryNotes}</span>}
-                    </li>
-                  ))}
-                </ul>
-              </Section>
-            )}
-
-            {selected.familyInstructions && (
-              <Section title="Instructions">{selected.familyInstructions}</Section>
-            )}
-
-            {selected.idDocuments?.length > 0 && (
-              <Section title="ID documents">
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {selected.idDocuments.map((d) => (
-                    <a key={d._id} href={d.url} target="_blank" rel="noreferrer" className="btn-ghost text-xs py-1.5">
-                      {d.type === 'id_front' ? 'ID front' : 'ID back'}
-                    </a>
-                  ))}
-                </div>
-              </Section>
-            )}
-
-            {detail && (
-              <>
-                <Section title={`Bookings (${detail.bookings.length})`}>
-                  {detail.bookings.length === 0 ? '—' : (
-                    <ul className="space-y-1 mt-1">
-                      {detail.bookings.slice(0, 6).map((b) => (
-                        <li key={b._id} className="flex justify-between text-xs">
-                          <span>#{b.bookingNumber} · {b.nanny?.fullName || 'Unassigned'}</span>
-                          <span className="flex items-center gap-2">
-                            {money(b.totalAmount)} <Badge value={b.status} />
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Section>
-                <Section title={`Payments (${detail.payments.length})`}>
-                  {detail.payments.length === 0 ? '—' : (
-                    <ul className="space-y-1 mt-1">
-                      {detail.payments.slice(0, 6).map((p) => (
-                        <li key={p._id} className="flex justify-between text-xs">
-                          <span>{p.reference} · {dateTime(p.createdAt)}</span>
-                          <span>{money(p.amount)} <Badge value={p.status} /></span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </Section>
-              </>
-            )}
-          </div>
-        )}
+        {selected && <FamilyDetail family={detail?.family || selected} extra={detail} />}
       </Modal>
 
       {toast}
@@ -201,16 +180,71 @@ export default function Families() {
   );
 }
 
-const Field = ({ label, value }) => (
-  <div>
-    <dt className="text-xs text-slate-500">{label}</dt>
-    <dd className="font-medium text-slate-900">{value}</dd>
-  </div>
-);
+function FamilyDetail({ family, extra }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Avatar name={family.fullName} />
+        <div>
+          <p className="font-semibold text-white">{family.fullName}</p>
+          <p className="text-xs font-mono text-slate-500">{family.phone} · {family.email || 'no email'}</p>
+        </div>
+        <span className="ml-auto"><Badge value={family.blocked ? 'suspended' : 'active'} /></span>
+      </div>
 
-const Section = ({ title, children }) => (
-  <div>
-    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">{title}</p>
-    <div className="text-slate-700">{children}</div>
-  </div>
-);
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <Field label="Email Verified">{family.emailVerified ? 'Yes' : 'No'}</Field>
+        <Field label="ID Verified">{family.idVerified ? 'Yes' : 'No'}</Field>
+        <Field label="Joined">{date(family.createdAt)}</Field>
+        <Field label="Referral Code"><span className="font-mono text-xs">{family.referralCode || '—'}</span></Field>
+        <Field label="Referrals">{family.referralCount || 0}</Field>
+        <Field label="Total Spent">{money(extra?.stats?.spent ?? family.stats?.spent)}</Field>
+      </div>
+
+      {family.children?.length > 0 && (
+        <Field label="Children">
+          <ul className="space-y-1">
+            {family.children.map((c, i) => (
+              <li key={i} className="text-sm">
+                {c.name} — {c.age}
+                {c.allergies && <span className="text-slate-500"> · {c.allergies}</span>}
+                {c.dietary && <span className="text-slate-500"> · {c.dietary}</span>}
+              </li>
+            ))}
+          </ul>
+        </Field>
+      )}
+
+      {family.addresses?.length > 0 && (
+        <Field label="Saved addresses">
+          <ul className="space-y-1">
+            {family.addresses.map((a, i) => (
+              <li key={i} className="text-sm">
+                {a.label ? <span className="text-slate-400">{a.label}: </span> : null}
+                {a.addressLine || '—'}
+                {a.mapUrl && (
+                  <a href={a.mapUrl} target="_blank" rel="noreferrer" className="ml-2 text-brand-400 text-xs">Map</a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Field>
+      )}
+
+      {extra?.bookings?.length > 0 && (
+        <div>
+          <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">Recent bookings</p>
+          <ul className="space-y-1.5">
+            {extra.bookings.slice(0, 6).map((b) => (
+              <li key={b._id} className="flex items-center justify-between text-sm">
+                <span className="font-mono text-xs text-slate-500">#{b.bookingNumber}</span>
+                <span className="text-slate-400">{date(b.startDate)}</span>
+                <Badge value={b.status} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

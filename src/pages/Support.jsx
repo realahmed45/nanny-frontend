@@ -1,11 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../lib/api.js';
 import {
-  PageHeader, Table, Badge, Pagination, Tabs, Modal, ErrorBox,
-  useToast, date, dateTime, humanize,
+  PageHeader, Table, Badge, Priority, Modal, Field, FilterPills, StatCard,
+  Pagination, useToast, ErrorBox, date, dateTime, age, humanize,
 } from '../components/ui.jsx';
+import { IconEye, IconAlert, IconActivity, IconCheck, IconUser } from '../components/icons.jsx';
 
-const TABS = [
+const FILTERS = [
   { value: '', label: 'All' },
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
@@ -14,170 +15,217 @@ const TABS = [
 ];
 
 export default function Support() {
-  const [status, setStatus] = useState('open');
+  const { toast, notify, error: toastError } = useToast();
+  const [data, setData] = useState({ items: [], total: 0, pages: 0 });
+  const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [detail, setDetail] = useState(null);
   const [reply, setReply] = useState('');
-  const { toast, notify, error: notifyError } = useToast();
+  const [sending, setSending] = useState(false);
 
-  const load = useCallback(() => {
+  const load = () => {
     setLoading(true);
-    setError('');
-    api('/tickets', { params: { status, page, limit: 20 } })
+    const qs = new URLSearchParams({ page, limit: 25 });
+    if (filter) qs.set('status', filter);
+    api(`/tickets?${qs}`)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [status, page]);
+  };
 
-  useEffect(load, [load]);
+  useEffect(load, [filter, page]);
 
-  const openTicket = async (row) => {
+  const open = (t) => {
+    setSelected(t);
+    setDetail(null);
     setReply('');
-    try {
-      const { ticket } = await api(`/tickets/${row._id}`);
-      setSelected(ticket);
-    } catch (e) {
-      notifyError(e.message);
-    }
+    api(`/tickets/${t._id}`).then(setDetail).catch(() => setDetail({ ticket: t }));
   };
 
-  const sendReply = async () => {
+  const send = async () => {
     if (!reply.trim()) return;
+    setSending(true);
     try {
-      const { ticket } = await api(`/tickets/${selected._id}/reply`, {
-        method: 'POST', body: { body: reply.trim() },
-      });
-      setSelected(ticket);
-      setReply('');
+      await api(`/tickets/${selected._id}/reply`, { method: 'POST', body: { body: reply.trim() } });
       notify('Reply sent over WhatsApp.');
-      load();
+      setReply('');
+      api(`/tickets/${selected._id}`).then(setDetail);
     } catch (e) {
-      notifyError(e.message);
+      toastError(e.message);
+    } finally {
+      setSending(false);
     }
   };
 
-  const setTicketStatus = async (newStatus) => {
+  const setStatus = async (status) => {
     try {
-      const { ticket } = await api(`/tickets/${selected._id}`, {
-        method: 'PATCH', body: { status: newStatus },
-      });
-      setSelected(ticket);
-      notify(`Ticket marked ${humanize(newStatus)}.`);
+      await api(`/tickets/${selected._id}`, { method: 'PATCH', body: { status } });
+      notify(`Ticket marked ${humanize(status).toLowerCase()}.`);
+      setSelected(null);
       load();
     } catch (e) {
-      notifyError(e.message);
+      toastError(e.message);
     }
   };
 
-  // Spec (8/11 update): the "Assigned to" column is removed for now.
+  const items = data.items || [];
+  const counts = {
+    open: items.filter((t) => t.status === 'open').length,
+    inProgress: items.filter((t) => t.status === 'in_progress').length,
+    resolved: items.filter((t) => t.status === 'resolved').length,
+    unassigned: items.filter((t) => !t.assignedTo && ['open', 'in_progress'].includes(t.status)).length,
+  };
+  const highPriority = items.filter((t) => ['high', 'urgent'].includes(t.priority)).length;
+
   const columns = [
-    { key: 'ticketNumber', header: 'Ticket', render: (r) => (
-      <div>
-        <p className="font-medium text-slate-900">{r.ticketNumber}</p>
-        <p className="text-xs text-slate-500">{humanize(r.category)}</p>
-      </div>
-    ) },
-    { key: 'subject', header: 'Subject', render: (r) => (
-      <div className="max-w-xs">
-        <p className="truncate">{r.subject}</p>
-        <p className="text-xs text-slate-500 truncate">{r.description}</p>
-      </div>
-    ) },
-    { key: 'raisedBy', header: 'Raised by', render: (r) => (
-      <div>
-        <p>{r.raisedBy?.fullName || '—'}</p>
-        <p className="text-xs text-slate-500">{humanize(r.raisedByRole)}</p>
-      </div>
-    ) },
-    { key: 'booking', header: 'Booking', render: (r) => r.booking ? `#${r.booking.bookingNumber}` : '—' },
-    { key: 'priority', header: 'Priority', render: (r) => <Badge value={r.priority} /> },
-    { key: 'status', header: 'Status', render: (r) => <Badge value={r.status} /> },
-    { key: 'createdAt', header: 'Created', render: (r) => date(r.createdAt) },
+    {
+      key: 'id', header: 'Ticket ID',
+      render: (t) => <span className="font-mono text-xs text-brand-400">#{t.ticketNumber}</span>,
+    },
+    {
+      key: 'user', header: 'User',
+      render: (t) => (
+        <div>
+          <p className="text-slate-100">{t.raisedBy?.fullName || '—'}</p>
+          <p className="font-mono text-[11px] text-slate-500">{t.raisedBy?.phone}</p>
+        </div>
+      ),
+    },
+    { key: 'type', header: 'Type', render: (t) => <Badge value={t.raisedByRole} /> },
+    { key: 'category', header: 'Category', render: (t) => humanize(t.category) },
+    {
+      key: 'booking', header: 'Booking',
+      render: (t) => <span className="font-mono text-xs">{t.booking?.bookingNumber ? `#${t.booking.bookingNumber}` : '—'}</span>,
+    },
+    {
+      key: 'issue', header: 'Issue',
+      render: (t) => (
+        <span className="block max-w-[200px] truncate text-slate-300" title={t.subject || t.description}>
+          {t.subject || t.description || '—'}
+        </span>
+      ),
+    },
+    { key: 'priority', header: 'Priority', render: (t) => <Priority value={t.priority} /> },
+    { key: 'age', header: 'Age', render: (t) => <span className="font-mono text-xs">{age(t.createdAt)}</span> },
+    { key: 'submitted', header: 'Submitted', render: (t) => <span className="font-mono text-xs">{date(t.createdAt)}</span> },
+    { key: 'status', header: 'Status', render: (t) => <Badge value={t.status} /> },
+    {
+      key: 'assigned', header: 'Assigned To',
+      render: (t) => t.assignedTo || <span className="text-slate-600">—</span>,
+    },
+    {
+      key: 'view', header: '',
+      render: (t) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); open(t); }}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-400 hover:text-brand-300"
+        >
+          <IconEye size={14} /> View
+        </button>
+      ),
+    },
   ];
+
+  if (error) return <ErrorBox error={error} onRetry={load} />;
 
   return (
     <>
-      <PageHeader title="Support" subtitle="Tickets raised by families and nannies" />
+      <PageHeader
+        title="Support Tickets"
+        subtitle={`${counts.open} open · ${highPriority} high priority`}
+      />
 
-      <Tabs tabs={TABS} active={status} onChange={(v) => { setStatus(v); setPage(1); }} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+        <StatCard label="Open" value={counts.open} icon={<IconAlert size={17} />} tone="red" />
+        <StatCard label="In Progress" value={counts.inProgress} icon={<IconActivity size={17} />} tone="amber" />
+        <StatCard label="Resolved" value={counts.resolved} icon={<IconCheck size={17} />} tone="emerald" />
+        <StatCard label="Unassigned" value={counts.unassigned} icon={<IconUser size={17} />} tone="violet" />
+      </div>
 
-      <ErrorBox error={error} onRetry={load} />
-      {!error && (
-        <>
-          <Table columns={columns} rows={data?.items} loading={loading}
-            onRowClick={openTicket} empty="No tickets found." />
-          <Pagination page={data?.page} pages={data?.pages} total={data?.total} onChange={setPage} />
-        </>
-      )}
+      <FilterPills options={FILTERS} active={filter} onChange={(v) => { setFilter(v); setPage(1); }} />
+
+      <Table columns={columns} rows={items} loading={loading} onRowClick={open} dense empty="No tickets yet." />
+      <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
 
       <Modal
-        open={!!selected}
-        title={selected ? `Ticket ${selected.ticketNumber}` : ''}
+        open={Boolean(selected)}
+        title={selected ? `Ticket #${selected.ticketNumber}` : ''}
         onClose={() => setSelected(null)}
-        footer={selected && (
+        wide
+        footer={
           <>
-            {selected.status !== 'resolved' && (
-              <button className="btn-ghost" onClick={() => setTicketStatus('resolved')}>Mark resolved</button>
+            {selected?.status !== 'in_progress' && (
+              <button className="btn-ghost" onClick={() => setStatus('in_progress')}>Mark in progress</button>
             )}
-            {selected.status !== 'closed' && (
-              <button className="btn-ghost" onClick={() => setTicketStatus('closed')}>Close</button>
+            {selected?.status !== 'resolved' && (
+              <button className="btn-primary" onClick={() => setStatus('resolved')}>Resolve</button>
             )}
-            <button className="btn-primary" onClick={sendReply} disabled={!reply.trim()}>Send reply</button>
           </>
-        )}
+        }
       >
         {selected && (
-          <div className="space-y-4 text-sm">
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-3">
               <Badge value={selected.status} />
-              <Badge value={selected.priority} />
-              <Badge value={selected.category}>{humanize(selected.category)}</Badge>
+              <Priority value={selected.priority} />
+              <Badge value={selected.raisedByRole} />
             </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <Field label="Raised by">{selected.raisedBy?.fullName}</Field>
+              <Field label="Phone"><span className="font-mono text-xs">{selected.raisedBy?.phone}</span></Field>
+              <Field label="Category">{humanize(selected.category)}</Field>
+              <Field label="Booking">
+                {selected.booking?.bookingNumber ? `#${selected.booking.bookingNumber}` : '—'}
+              </Field>
+              <Field label="Submitted">{dateTime(selected.createdAt)}</Field>
+              <Field label="Age">{age(selected.createdAt)}</Field>
+            </div>
+
+            <Field label="Issue">{selected.subject || '—'}</Field>
+            {selected.description && <Field label="Details">{selected.description}</Field>}
 
             <div>
-              <p className="font-medium text-slate-900">{selected.subject}</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {selected.raisedBy?.fullName} ({humanize(selected.raisedByRole)}) · {dateTime(selected.createdAt)}
+              <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+                Conversation
               </p>
-              {selected.raisedBy?.phone && (
-                <p className="text-xs text-slate-500">📱 {selected.raisedBy.phone}</p>
-              )}
-            </div>
-
-            <div className="bg-slate-50 rounded-lg p-3 text-slate-700 whitespace-pre-wrap">
-              {selected.description}
-            </div>
-
-            {selected.booking && (
-              <p className="text-xs text-slate-500">
-                Related booking: <strong>#{selected.booking.bookingNumber}</strong>
-              </p>
-            )}
-
-            {selected.replies?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Conversation</p>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {selected.replies.map((r, i) => (
-                    <div key={i} className={`rounded-lg p-2.5 text-xs ${
-                      r.from === 'admin' ? 'bg-brand-50 text-brand-900 ml-6' : 'bg-slate-100 text-slate-700 mr-6'
-                    }`}>
-                      <p className="whitespace-pre-wrap">{r.body}</p>
-                      <p className="text-[10px] opacity-60 mt-1">{r.from === 'admin' ? 'Support' : 'User'} · {dateTime(r.at)}</p>
-                    </div>
-                  ))}
-                </div>
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {(detail?.ticket?.replies || selected.replies || []).map((r, i) => (
+                  <div
+                    key={i}
+                    className={`p-2.5 rounded-lg text-sm ${
+                      r.from === 'admin'
+                        ? 'bg-brand-600/15 text-brand-100 ml-8'
+                        : 'bg-ink-800 text-slate-300 mr-8'
+                    }`}
+                  >
+                    <p>{r.body}</p>
+                    <p className="text-[10px] font-mono text-slate-500 mt-1">
+                      {r.from === 'admin' ? 'Support' : 'User'} · {dateTime(r.at)}
+                    </p>
+                  </div>
+                ))}
+                {!(detail?.ticket?.replies || selected.replies || []).length && (
+                  <p className="text-sm text-slate-500">No replies yet.</p>
+                )}
               </div>
-            )}
+            </div>
 
             <div>
-              <label className="label">Reply (sent over WhatsApp)</label>
-              <textarea className="input" rows={3} value={reply}
+              <label className="label" htmlFor="reply">Reply (sent over WhatsApp)</label>
+              <textarea
+                id="reply"
+                className="input min-h-[80px] resize-y"
+                value={reply}
                 onChange={(e) => setReply(e.target.value)}
-                placeholder="Type your reply…" />
+                placeholder="Type your reply…"
+              />
+              <button className="btn-primary mt-2" onClick={send} disabled={sending || !reply.trim()}>
+                {sending ? 'Sending…' : 'Send reply'}
+              </button>
             </div>
           </div>
         )}

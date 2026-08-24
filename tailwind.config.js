@@ -4,14 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Near-black surfaces from the design: page → panel → raised.
+        ink: {
+          600: '#3a4358', 700: '#2a3244', 800: '#1a2030',
+          900: '#121826', 950: '#0a0e18',
+        },
         brand: {
-          50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 300: '#c4b5fd',
-          400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9',
-          800: '#5b21b6', 900: '#4c1d95',
+          400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb',
+          700: '#1d4ed8', 900: '#1e3a8a',
         },
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
     },
   },

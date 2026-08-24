@@ -1,49 +1,91 @@
 import { useEffect, useState } from 'react';
 
 /* ------------------------------------------------------------------ *
- * Status badges — colour-coded to match the chatbot's own vocabulary.
+ * Status badges — outlined pills, colour-coded to the chatbot's own
+ * vocabulary so a status reads the same here as it does in WhatsApp.
  * ------------------------------------------------------------------ */
 
 const BADGE_STYLES = {
-  // Booking statuses
-  upcoming: 'bg-amber-100 text-amber-800',
-  ongoing: 'bg-blue-100 text-blue-800',
-  completed: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-red-100 text-red-800',
-  draft: 'bg-slate-100 text-slate-700',
-  pending_payment: 'bg-orange-100 text-orange-800',
-  pending_additional_payment: 'bg-orange-100 text-orange-800',
-  // Nanny statuses
-  verified: 'bg-emerald-100 text-emerald-800',
-  pending_verification: 'bg-amber-100 text-amber-800',
-  rejected: 'bg-red-100 text-red-800',
-  suspended: 'bg-red-100 text-red-800',
+  // Booking
+  upcoming: 'bg-violet-500/10 text-violet-300 border-violet-500/30',
+  ongoing: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
+  completed: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  cancelled: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+  replacement_needed: 'bg-red-500/10 text-red-300 border-red-500/40',
+  draft: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+  pending_payment: 'bg-orange-500/10 text-orange-300 border-orange-500/30',
+  pending_additional_payment: 'bg-orange-500/10 text-orange-300 border-orange-500/30',
+  // Nanny / account
+  verified: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  pending_verification: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+  pending: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+  rejected: 'bg-red-500/10 text-red-300 border-red-500/40',
+  suspended: 'bg-red-500/10 text-red-300 border-red-500/40',
+  active: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  blocked: 'bg-red-500/10 text-red-300 border-red-500/40',
+  available: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  partially_booked: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
+  unavailable: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
   // Payments
-  payment_completed: 'bg-emerald-100 text-emerald-800',
-  payment_in_process: 'bg-amber-100 text-amber-800',
-  refund_in_process: 'bg-orange-100 text-orange-800',
-  refunded: 'bg-slate-100 text-slate-700',
-  payment_failed: 'bg-red-100 text-red-800',
-  // Payouts
-  pending: 'bg-amber-100 text-amber-800',
-  processing: 'bg-blue-100 text-blue-800',
-  final_payment_done: 'bg-emerald-100 text-emerald-800',
-  failed: 'bg-red-100 text-red-800',
+  paid: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  payment_completed: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  payment_in_process: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+  in_process: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+  refund_in_process: 'bg-violet-500/10 text-violet-300 border-violet-500/30',
+  refunded: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+  payment_failed: 'bg-red-500/10 text-red-300 border-red-500/40',
+  processing: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
+  final_payment_done: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  failed: 'bg-red-500/10 text-red-300 border-red-500/40',
   // Tickets
-  open: 'bg-amber-100 text-amber-800',
-  in_progress: 'bg-blue-100 text-blue-800',
-  resolved: 'bg-emerald-100 text-emerald-800',
-  closed: 'bg-slate-100 text-slate-700',
-  urgent: 'bg-red-100 text-red-800',
-  high: 'bg-orange-100 text-orange-800',
-  medium: 'bg-amber-100 text-amber-800',
-  low: 'bg-slate-100 text-slate-700',
+  open: 'bg-red-500/10 text-red-300 border-red-500/40',
+  in_progress: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+  resolved: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  closed: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+  successful: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+  invited: 'bg-violet-500/10 text-violet-300 border-violet-500/30',
+  // Roles
+  family: 'bg-violet-500/10 text-violet-300 border-violet-500/30',
+  nanny: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
 };
 
-export function Badge({ value, children }) {
+/** Shorter labels where the raw enum reads awkwardly in a table cell. */
+const BADGE_LABELS = {
+  payment_completed: 'Paid',
+  payment_in_process: 'In Process',
+  payment_failed: 'Failed',
+  pending_verification: 'Pending',
+  final_payment_done: 'Paid Out',
+};
+
+export function Badge({ value, children, className = '' }) {
   const key = String(value || '').toLowerCase();
-  const style = BADGE_STYLES[key] || 'bg-slate-100 text-slate-700';
-  return <span className={`badge ${style}`}>{children ?? humanize(value)}</span>;
+  const style = BADGE_STYLES[key] || 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+  return (
+    <span className={`badge ${style} ${className}`}>
+      {children ?? BADGE_LABELS[key] ?? humanize(value)}
+    </span>
+  );
+}
+
+/** Coloured dot + label used for ticket priority in the design. */
+const PRIORITY_TONE = {
+  urgent: ['text-red-400', 'bg-red-400'],
+  critical: ['text-red-400', 'bg-red-400'],
+  high: ['text-orange-400', 'bg-orange-400'],
+  medium: ['text-amber-400', 'bg-amber-400'],
+  low: ['text-slate-400', 'bg-slate-400'],
+};
+
+export function Priority({ value }) {
+  const key = String(value || 'low').toLowerCase();
+  const [text, dot] = PRIORITY_TONE[key] || PRIORITY_TONE.low;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-mono ${text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+      {humanize(key)}
+    </span>
+  );
 }
 
 export const humanize = (s) =>
@@ -56,14 +98,50 @@ export const humanize = (s) =>
  * ------------------------------------------------------------------ */
 
 export const money = (n, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 })
-    .format(Number(n || 0));
+  new Intl.NumberFormat('en-US', {
+    style: 'currency', currency, maximumFractionDigits: 0,
+  }).format(Number(n || 0));
 
 export const date = (d) =>
   d ? new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
+export const shortDate = (d) =>
+  d ? new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) : '—';
+
 export const dateTime = (d) =>
-  d ? new Date(d).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+  d ? new Date(d).toLocaleString('en-US', {
+    day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
+  }) : '—';
+
+/** "2h", "3d" — the age column on tickets. */
+export const age = (d) => {
+  if (!d) return '—';
+  const mins = Math.floor((Date.now() - new Date(d)) / 60000);
+  if (mins < 60) return `${Math.max(1, mins)}m`;
+  if (mins < 1440) return `${Math.floor(mins / 60)}h`;
+  return `${Math.floor(mins / 1440)}d`;
+};
+
+/** Initials avatar — the coloured circle beside names in the design. */
+const AVATAR_TONES = [
+  'bg-blue-500/20 text-blue-300', 'bg-violet-500/20 text-violet-300',
+  'bg-emerald-500/20 text-emerald-300', 'bg-amber-500/20 text-amber-300',
+  'bg-rose-500/20 text-rose-300', 'bg-cyan-500/20 text-cyan-300',
+];
+
+export function Avatar({ name, size = 'md' }) {
+  const initial = String(name || '?').trim().charAt(0).toUpperCase();
+  // Stable colour per name, so a person keeps the same avatar everywhere.
+  const tone = AVATAR_TONES[
+    String(name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_TONES.length
+  ];
+  const dims = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs';
+  return (
+    <span className={`${dims} ${tone} rounded-full inline-flex items-center justify-center font-semibold shrink-0`}>
+      {initial}
+    </span>
+  );
+}
 
 /* ------------------------------------------------------------------ *
  * Layout primitives
@@ -73,7 +151,7 @@ export function PageHeader({ title, subtitle, actions }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+        <h1 className="text-2xl font-semibold text-white">{title}</h1>
         {subtitle && <p className="text-sm text-slate-500 mt-1">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
@@ -81,49 +159,57 @@ export function PageHeader({ title, subtitle, actions }) {
   );
 }
 
-export function StatCard({ label, value, hint, tone = 'default', icon }) {
-  const tones = {
-    default: 'text-slate-900',
-    positive: 'text-emerald-600',
-    negative: 'text-red-600',
-    warn: 'text-amber-600',
-    brand: 'text-brand-600',
-  };
+const STAT_TONES = {
+  default: 'bg-ink-800 text-slate-400',
+  blue: 'bg-blue-500/15 text-blue-400',
+  violet: 'bg-violet-500/15 text-violet-400',
+  emerald: 'bg-emerald-500/15 text-emerald-400',
+  amber: 'bg-amber-500/15 text-amber-400',
+  red: 'bg-red-500/15 text-red-400',
+};
+
+export function StatCard({ label, value, hint, icon, tone = 'default' }) {
   return (
-    <div className="card p-5">
-      <div className="flex items-start justify-between">
-        <p className="text-sm font-medium text-slate-500">{label}</p>
-        {icon && <span className="text-lg" aria-hidden="true">{icon}</span>}
+    <div className="card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500">{label}</p>
+        {icon && (
+          <span className={`w-8 h-8 rounded-lg grid place-items-center shrink-0 ${STAT_TONES[tone]}`}>
+            {icon}
+          </span>
+        )}
       </div>
-      <p className={`text-2xl font-semibold mt-2 ${tones[tone]}`}>{value}</p>
-      {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
+      <p className="text-3xl font-semibold text-white mt-2 leading-none">{value}</p>
+      {hint && <p className="text-xs text-slate-500 mt-2">{hint}</p>}
     </div>
   );
 }
 
-export function Table({ columns, rows, empty = 'No records found.', onRowClick, loading }) {
+export function Table({ columns, rows, empty = 'No records found.', onRowClick, loading, dense }) {
   if (loading) return <Skeleton rows={5} />;
   if (!rows?.length) {
-    return (
-      <div className="card p-10 text-center text-sm text-slate-500">{empty}</div>
-    );
+    return <div className="card p-12 text-center text-sm text-slate-500">{empty}</div>;
   }
   return (
     <div className="card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>{columns.map((c) => <th key={c.key} className="th">{c.header}</th>)}</tr>
+          <thead className="border-b border-ink-800">
+            <tr>{columns.map((c) => (
+              <th key={c.key} className={`th whitespace-nowrap ${dense ? 'px-2.5' : ''}`}>{c.header}</th>
+            ))}</tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-ink-800">
             {rows.map((row, i) => (
               <tr
                 key={row._id || i}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={onRowClick ? 'cursor-pointer hover:bg-slate-50' : undefined}
+                className={onRowClick ? 'cursor-pointer transition-colors hover:bg-ink-800/60' : undefined}
               >
                 {columns.map((c) => (
-                  <td key={c.key} className="td">{c.render ? c.render(row) : row[c.key] ?? '—'}</td>
+                  <td key={c.key} className={`td ${dense ? 'px-2.5 py-3' : ''}`}>
+                    {c.render ? c.render(row) : row[c.key] ?? '—'}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -138,7 +224,7 @@ export function Skeleton({ rows = 4 }) {
   return (
     <div className="card p-4 space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-10 bg-slate-100 rounded animate-pulse" />
+        <div key={i} className="h-10 bg-ink-800 rounded animate-pulse" />
       ))}
     </div>
   );
@@ -157,22 +243,44 @@ export function Pagination({ page, pages, total, onChange }) {
   );
 }
 
+/** Pill-style filter row (Bookings, Support, Calendar). */
+export function FilterPills({ options, active, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-2 mb-5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            active === o.value
+              ? 'bg-brand-600 text-white'
+              : 'bg-ink-800 text-slate-400 hover:text-slate-200 hover:bg-ink-700'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Underlined tabs (Payments). */
 export function Tabs({ tabs, active, onChange }) {
   return (
-    <div className="flex flex-wrap gap-1 border-b border-slate-200 mb-5">
+    <div className="flex flex-wrap gap-6 border-b border-ink-800 mb-5">
       {tabs.map((t) => (
         <button
           key={t.value}
           onClick={() => onChange(t.value)}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+          className={`pb-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
             active === t.value
-              ? 'border-brand-600 text-brand-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
+              ? 'border-brand-500 text-brand-400'
+              : 'border-transparent text-slate-500 hover:text-slate-300'
           }`}
         >
           {t.label}
           {t.count !== undefined && (
-            <span className="ml-2 text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{t.count}</span>
+            <span className="ml-2 text-xs text-slate-500">{t.count}</span>
           )}
         </button>
       ))}
@@ -180,7 +288,7 @@ export function Tabs({ tabs, active, onChange }) {
   );
 }
 
-export function Modal({ open, title, onClose, children, footer }) {
+export function Modal({ open, title, onClose, children, footer, wide }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => e.key === 'Escape' && onClose?.();
@@ -191,20 +299,29 @@ export function Modal({ open, title, onClose, children, footer }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/40" onClick={onClose} />
-      <div className="relative card w-full max-w-lg max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-          <h3 className="font-semibold text-slate-900">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className={`relative card w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[85vh] flex flex-col shadow-2xl`}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-800">
+          <h3 className="font-semibold text-white">{title}</h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-xl leading-none">&times;</button>
         </div>
         <div className="p-5 overflow-y-auto flex-1">{children}</div>
-        {footer && <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-2">{footer}</div>}
+        {footer && <div className="px-5 py-4 border-t border-ink-800 flex justify-end gap-2">{footer}</div>}
       </div>
     </div>
   );
 }
 
-/** Small toast used for action feedback. */
+/** Label/value row used throughout the detail modals. */
+export function Field({ label, children }) {
+  return (
+    <div>
+      <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-1">{label}</p>
+      <div className="text-sm text-slate-200">{children ?? '—'}</div>
+    </div>
+  );
+}
+
 export function useToast() {
   const [toast, setToast] = useState(null);
   useEffect(() => {
@@ -214,8 +331,10 @@ export function useToast() {
   }, [toast]);
 
   const node = toast ? (
-    <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
-      toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'
+    <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-2xl text-sm font-medium border ${
+      toast.type === 'error'
+        ? 'bg-red-950 border-red-800 text-red-200'
+        : 'bg-ink-800 border-ink-700 text-slate-100'
     }`}>
       {toast.message}
     </div>
@@ -231,8 +350,8 @@ export function useToast() {
 export function ErrorBox({ error, onRetry }) {
   if (!error) return null;
   return (
-    <div className="card p-5 border-red-200 bg-red-50">
-      <p className="text-sm text-red-800 font-medium">{error}</p>
+    <div className="card p-5 border-red-900/60 bg-red-950/30">
+      <p className="text-sm text-red-300 font-medium">{error}</p>
       {onRetry && <button className="btn-ghost mt-3" onClick={onRetry}>Try again</button>}
     </div>
   );

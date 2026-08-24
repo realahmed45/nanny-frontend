@@ -1,260 +1,154 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../lib/api.js';
 import {
-  PageHeader, Table, Badge, Pagination, Tabs, Modal, ErrorBox,
-  useToast, money, date, dateTime, humanize,
+  PageHeader, Table, Badge, Modal, Field, FilterPills, Pagination,
+  useToast, ErrorBox, money, date, humanize,
 } from '../components/ui.jsx';
+import { IconEye, IconCheck, IconClock } from '../components/icons.jsx';
 
-const TABS = [
+const FILTERS = [
   { value: '', label: 'All' },
-  { value: 'upcoming', label: 'Upcoming' },
   { value: 'ongoing', label: 'Ongoing' },
-  { value: 'pending_additional_payment', label: 'Pending Payment' },
+  { value: 'upcoming', label: 'Upcoming' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
+  { value: 'replacement_needed', label: 'Replacement Needed' },
 ];
 
+/** A booking awaiting a replacement reads as its own status in the UI. */
+export const statusOf = (b) =>
+  b.subStatus === 'nanny_cancelled_awaiting_replacement' ? 'replacement_needed' : b.status;
+
+/** "9:00–11:00 AM" from a start time and a duration. */
+export function timeRange(startTime, hours) {
+  if (!startTime) return '—';
+  const [h, m = 0] = startTime.split(':').map(Number);
+  const fmt = (hh, mm) => {
+    const suffix = hh >= 12 ? 'PM' : 'AM';
+    const hour = hh % 12 === 0 ? 12 : hh % 12;
+    return `${hour}:${String(mm).padStart(2, '0')} ${suffix}`;
+  };
+  if (!hours) return fmt(h, m);
+  const end = h + hours;
+  return `${fmt(h, m).replace(/ [AP]M$/, '')}–${fmt(end % 24, m)}`;
+}
+
 export default function Bookings() {
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
+  const { toast, notify, error: toastError } = useToast();
+  const [data, setData] = useState({ items: [], total: 0, pages: 0 });
+  const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [refundPreview, setRefundPreview] = useState(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const { toast, notify, error: notifyError } = useToast();
+  const [refund, setRefund] = useState(null);
 
-  const load = useCallback(() => {
+  const load = () => {
     setLoading(true);
-    setError('');
-    api('/bookings', { params: { status, search, page, limit: 20 } })
+    const qs = new URLSearchParams({ page, limit: 25 });
+    // "Replacement needed" is a sub-status, so it filters client-side.
+    if (filter && filter !== 'replacement_needed') qs.set('status', filter);
+    api(`/bookings?${qs}`)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [status, search, page]);
+  };
 
-  useEffect(load, [load]);
+  useEffect(load, [filter, page]);
 
-  const openDetail = async (row) => {
-    setSelected(row);
+  const open = (b) => {
+    setSelected(b);
     setDetail(null);
-    setRefundPreview(null);
-    setCancelReason('');
-    try {
-      const [d, preview] = await Promise.all([
-        api(`/bookings/${row._id}`),
-        row.status === 'cancelled' || row.status === 'completed'
-          ? Promise.resolve(null)
-          : api(`/bookings/${row._id}/refund-preview`).catch(() => null),
-      ]);
-      setDetail(d);
-      setRefundPreview(preview);
-    } catch (e) {
-      notifyError(e.message);
-    }
+    setRefund(null);
+    api(`/bookings/${b._id}`).then(setDetail).catch(() => setDetail({ booking: b }));
+    api(`/bookings/${b._id}/refund-preview`).then(setRefund).catch(() => {});
   };
 
   const cancel = async () => {
-    if (!window.confirm('Cancel this booking? The family will be refunded for all unused services.')) return;
+    if (!window.confirm('Cancel this booking and apply the refund policy?')) return;
     try {
-      const res = await api(`/bookings/${selected._id}/cancel`, {
-        method: 'POST', body: { reason: cancelReason },
+      await api(`/bookings/${selected._id}/cancel`, {
+        method: 'POST',
+        body: { reason: 'Cancelled by admin' },
       });
-      notify(`Booking cancelled. Refund: ${money(res.breakdown.totalRefund)}`);
+      notify(`Booking #${selected.bookingNumber} cancelled.`);
       setSelected(null);
       load();
     } catch (e) {
-      notifyError(e.message);
+      toastError(e.message);
     }
   };
 
+  const rows = filter === 'replacement_needed'
+    ? (data.items || []).filter((b) => statusOf(b) === 'replacement_needed')
+    : data.items || [];
+
   const columns = [
-    { key: 'bookingNumber', header: 'Booking', render: (r) => (
-      <div>
-        <p className="font-medium text-slate-900">#{r.bookingNumber}</p>
-        <p className="text-xs text-slate-500">{date(r.startDate)}{r.isMultiDay ? ` – ${date(r.endDate)}` : ''}</p>
-      </div>
-    ) },
-    { key: 'family', header: 'Family', render: (r) => r.family?.fullName || '—' },
-    { key: 'nanny', header: 'Nanny', render: (r) =>
-      r.nanny?.fullName || <span className="text-amber-700 text-xs">Replacement needed</span> },
-    { key: 'status', header: 'Status', render: (r) => (
-      <div className="space-y-1">
-        <Badge value={r.status} />
-        {r.subStatus && <p className="text-xs text-slate-500">{humanize(r.subStatus)}</p>}
-      </div>
-    ) },
-    { key: 'days', header: 'Days', render: (r) => (r.serviceDays || []).length },
-    { key: 'totalAmount', header: 'Amount', render: (r) => money(r.totalAmount) },
-    { key: 'paymentStatus', header: 'Payment', render: (r) => <Badge value={r.paymentStatus} /> },
+    {
+      key: 'id', header: 'Booking ID',
+      render: (b) => <span className="font-mono text-xs text-brand-400">#{b.bookingNumber}</span>,
+    },
+    { key: 'family', header: 'Family', render: (b) => b.family?.fullName || '—' },
+    { key: 'nanny', header: 'Nanny', render: (b) => b.nanny?.fullName || <span className="text-slate-600">Unassigned</span> },
+    {
+      key: 'date', header: 'Date',
+      render: (b) => (
+        <span className="font-mono text-xs">
+          {b.isMultiDay && b.endDate
+            ? `${date(b.startDate)} – ${date(b.endDate)}`
+            : date(b.startDate)}
+        </span>
+      ),
+    },
+    {
+      key: 'time', header: 'Time',
+      render: (b) => <span className="font-mono text-xs">{timeRange(b.startTime, b.hoursPerDay)}</span>,
+    },
+    { key: 'type', header: 'Type', render: (b) => (b.isMultiDay ? 'Multiple Days' : 'Single Day') },
+    { key: 'status', header: 'Status', render: (b) => <Badge value={statusOf(b)} /> },
+    { key: 'arrival', header: 'Arrival OTP', render: (b) => <OtpCell booking={b} kind="arrival" /> },
+    { key: 'end', header: 'End OTP', render: (b) => <OtpCell booking={b} kind="end" /> },
+    { key: 'payment', header: 'Payment', render: (b) => <Badge value={b.paymentStatus} /> },
+    {
+      key: 'amount', header: 'Amount',
+      render: (b) => <span className="font-mono text-xs">{money(b.totalAmount)}</span>,
+    },
+    {
+      key: 'view', header: '',
+      render: (b) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); open(b); }}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-400 hover:text-brand-300"
+        >
+          <IconEye size={14} /> View
+        </button>
+      ),
+    },
   ];
 
-  const canCancel = selected && !['cancelled', 'completed'].includes(selected.status);
+  if (error) return <ErrorBox error={error} onRetry={load} />;
 
   return (
     <>
-      <PageHeader title="Bookings" subtitle="Every booking across its full lifecycle" />
+      <PageHeader title="All Bookings" subtitle={`${data.total} total bookings on platform`} />
+      <FilterPills options={FILTERS} active={filter} onChange={(v) => { setFilter(v); setPage(1); }} />
 
-      <Tabs tabs={TABS} active={status} onChange={(v) => { setStatus(v); setPage(1); }} />
-
-      <input
-        className="input max-w-sm mb-4"
-        placeholder="Search by booking number…"
-        value={search}
-        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-      />
-
-      <ErrorBox error={error} onRetry={load} />
-      {!error && (
-        <>
-          <Table columns={columns} rows={data?.items} loading={loading}
-            onRowClick={openDetail} empty="No bookings found." />
-          <Pagination page={data?.page} pages={data?.pages} total={data?.total} onChange={setPage} />
-        </>
-      )}
+      <Table columns={columns} rows={rows} loading={loading} onRowClick={open} dense empty="No bookings yet." />
+      <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
 
       <Modal
-        open={!!selected}
+        open={Boolean(selected)}
         title={selected ? `Booking #${selected.bookingNumber}` : ''}
         onClose={() => setSelected(null)}
-        footer={canCancel && (
-          <button className="btn-danger" onClick={cancel}>Cancel Booking</button>
-        )}
+        wide
+        footer={
+          selected && !['cancelled', 'completed'].includes(selected.status) ? (
+            <button className="btn-danger" onClick={cancel}>Cancel booking</button>
+          ) : null
+        }
       >
-        {selected && (
-          <div className="space-y-4 text-sm">
-            <div className="flex flex-wrap gap-2">
-              <Badge value={selected.status} />
-              {selected.subStatus && <Badge value={selected.subStatus}>{humanize(selected.subStatus)}</Badge>}
-              <Badge value={selected.paymentStatus} />
-            </div>
-
-            <dl className="grid grid-cols-2 gap-3">
-              <Field label="Family" value={selected.family?.fullName || '—'} />
-              <Field label="Nanny" value={selected.nanny?.fullName || 'Not assigned'} />
-              <Field label="Dates" value={`${date(selected.startDate)}${selected.isMultiDay ? ` – ${date(selected.endDate)}` : ''}`} />
-              <Field label="Time" value={`${selected.startTime} · ${selected.hoursPerDay}h/day`} />
-              <Field label="Rate" value={`${money(selected.hourlyRate)}/hr`} />
-              <Field label="Total" value={money(selected.totalAmount)} />
-              <Field label="Paid" value={money(selected.paidAmount)} />
-              <Field label="Refunded" value={money(selected.refundedAmount)} />
-            </dl>
-
-            {selected.repeatDays?.length > 0 && (
-              <Section title="Repeats on">{selected.repeatDays.join(', ')}</Section>
-            )}
-
-            <Section title="Address">
-              {selected.address?.addressLine || '—'}
-              {selected.address?.mapUrl && (
-                <a href={selected.address.mapUrl} target="_blank" rel="noreferrer"
-                  className="block text-brand-600 hover:underline text-xs mt-0.5">📍 Open map</a>
-              )}
-            </Section>
-
-            <Section title="Requirements">
-              <p>🗣 {(selected.requirements?.languages || []).join(', ') || '—'}</p>
-              <p>🛠 {(selected.requirements?.skills || []).join(', ') || '—'}</p>
-              {selected.requirements?.subjects?.length > 0 && <p>📚 {selected.requirements.subjects.join(', ')}</p>}
-              <p className="text-xs text-slate-500 mt-1">
-                Budget {money(selected.requirements?.budgetMin)}–{money(selected.requirements?.budgetMax)}/hr
-                {selected.requirements?.cpr === 'required' && ' · CPR required'}
-              </p>
-            </Section>
-
-            {selected.children?.length > 0 && (
-              <Section title={`Children (${selected.children.length})`}>
-                <ul className="space-y-1.5 mt-1">
-                  {selected.children.map((c, i) => (
-                    <li key={i} className="text-xs">
-                      <span className="font-medium text-slate-800">{c.name} — {c.age}</span>
-                      {c.medicalNotes && <span className="block text-amber-700">⚠️ {c.medicalNotes}</span>}
-                      {c.dietaryNotes && <span className="block text-slate-500">🍽 {c.dietaryNotes}</span>}
-                    </li>
-                  ))}
-                </ul>
-              </Section>
-            )}
-
-            {selected.agentCallRequested && (
-              <p className="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-800">
-                📞 Family asked an agent to call and collect the remaining child details.
-              </p>
-            )}
-
-            {selected.otherInstructions && (
-              <Section title="Other instructions">{selected.otherInstructions}</Section>
-            )}
-
-            <Section title={`Service days (${(selected.serviceDays || []).length})`}>
-              <div className="max-h-44 overflow-y-auto space-y-1 mt-1">
-                {(selected.serviceDays || []).map((d) => (
-                  <div key={d._id} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-0">
-                    <span>{date(d.date)}</span>
-                    <div className="flex items-center gap-2">
-                      {d.overtimeHours > 0 && <span className="text-amber-700">+{d.overtimeHours}h OT</span>}
-                      <Badge value={d.status}>{humanize(d.status)}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Section>
-
-            {refundPreview && (
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
-                  If cancelled now (admin)
-                </p>
-                <p className="text-slate-700">Family refund: <strong>{money(refundPreview.totalRefund)}</strong></p>
-                <p className="text-slate-700">Nanny compensation: <strong>{money(refundPreview.totalNannyCompensation)}</strong></p>
-                {refundPreview.completedAmount > 0 && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    {money(refundPreview.completedAmount)} already delivered and not refundable.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {detail?.payments?.length > 0 && (
-              <Section title="Payments">
-                <ul className="space-y-1 mt-1">
-                  {detail.payments.map((p) => (
-                    <li key={p._id} className="flex justify-between text-xs">
-                      <span>{humanize(p.kind)} · {dateTime(p.createdAt)}</span>
-                      <span className="font-medium">{money(p.amount)} <Badge value={p.status} /></span>
-                    </li>
-                  ))}
-                </ul>
-              </Section>
-            )}
-
-            {selected.rating?.stars && (
-              <Section title="Rating">
-                ⭐ {selected.rating.stars}/5
-                {selected.rating.review && <p className="text-xs text-slate-600 mt-0.5">"{selected.rating.review}"</p>}
-              </Section>
-            )}
-
-            {selected.cancelledAt && (
-              <Section title="Cancellation">
-                <p>By {humanize(selected.cancelledBy)} on {dateTime(selected.cancelledAt)}</p>
-                {selected.cancellationReason && <p className="text-xs text-slate-500">{selected.cancellationReason}</p>}
-              </Section>
-            )}
-
-            {canCancel && (
-              <div>
-                <label className="label">Cancellation reason</label>
-                <textarea className="input" rows={2} value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="Shared with the family" />
-              </div>
-            )}
-          </div>
-        )}
+        {selected && <BookingDetail booking={detail?.booking || selected} extra={detail} refund={refund} />}
       </Modal>
 
       {toast}
@@ -262,16 +156,138 @@ export default function Bookings() {
   );
 }
 
-const Field = ({ label, value }) => (
-  <div>
-    <dt className="text-xs text-slate-500">{label}</dt>
-    <dd className="font-medium text-slate-900">{value}</dd>
-  </div>
-);
+/** Shows whether the arrival / end-of-service code has been confirmed. */
+function OtpCell({ booking, kind }) {
+  const days = booking.serviceDays || [];
+  if (!days.length) return <span className="text-slate-600">—</span>;
 
-const Section = ({ title, children }) => (
-  <div>
-    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">{title}</p>
-    <div className="text-slate-700">{children}</div>
-  </div>
-);
+  const done = kind === 'arrival'
+    ? days.every((d) => ['arrival_confirmed', 'awaiting_end_of_service', 'completed'].includes(d.status))
+    : days.every((d) => d.status === 'completed');
+
+  const waiting = kind === 'arrival'
+    ? days.some((d) => d.status === 'awaiting_arrival')
+    : days.some((d) => d.status === 'awaiting_end_of_service');
+
+  if (done) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-emerald-400">
+        <IconCheck size={13} /> Confirmed
+      </span>
+    );
+  }
+  if (waiting) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-amber-400">
+        <IconClock size={13} /> Pending
+      </span>
+    );
+  }
+  return <span className="text-slate-600">—</span>;
+}
+
+function BookingDetail({ booking, extra, refund }) {
+  const b = booking;
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <Badge value={statusOf(b)} />
+        <Badge value={b.paymentStatus} />
+        <span className="ml-auto font-mono text-sm text-slate-300">{money(b.totalAmount)}</span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <Field label="Family">{b.family?.fullName}</Field>
+        <Field label="Nanny">{b.nanny?.fullName || 'Unassigned'}</Field>
+        <Field label="Type">{b.isMultiDay ? 'Multiple days' : 'Single day'}</Field>
+        <Field label="Dates">
+          {b.isMultiDay && b.endDate ? `${date(b.startDate)} – ${date(b.endDate)}` : date(b.startDate)}
+        </Field>
+        <Field label="Time">{timeRange(b.startTime, b.hoursPerDay)}</Field>
+        <Field label="Hours / day">{b.hoursPerDay ?? '—'}</Field>
+        <Field label="Hourly rate">{money(b.hourlyRate)}</Field>
+        <Field label="Transport fee">{money(b.transportFee)}</Field>
+        <Field label="Paid">{money(b.paidAmount)}</Field>
+        {b.refundedAmount > 0 && <Field label="Refunded">{money(b.refundedAmount)}</Field>}
+        {b.additionalDue > 0 && <Field label="Additional due">{money(b.additionalDue)}</Field>}
+        <Field label="Reschedules">{b.rescheduleCount || 0}</Field>
+      </div>
+
+      <Field label="Address">
+        {b.address?.addressLine || '—'}
+        {b.address?.mapUrl && (
+          <a href={b.address.mapUrl} target="_blank" rel="noreferrer" className="ml-2 text-brand-400 text-xs">Map</a>
+        )}
+      </Field>
+
+      {b.children?.length > 0 && (
+        <Field label={`Children (${b.children.length})`}>
+          <ul className="space-y-1">
+            {b.children.map((c, i) => (
+              <li key={i} className="text-sm">
+                {c.name} — {c.age}
+                {c.allergies && <span className="text-slate-500"> · {c.allergies}</span>}
+                {c.dietary && <span className="text-slate-500"> · {c.dietary}</span>}
+              </li>
+            ))}
+          </ul>
+        </Field>
+      )}
+
+      {b.requirements && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Languages">
+            {b.requirements.languages?.map(humanize).join(', ') || '—'}
+          </Field>
+          <Field label="Skills">
+            {b.requirements.skills?.map(humanize).join(', ') || '—'}
+          </Field>
+        </div>
+      )}
+
+      {b.serviceDays?.length > 0 && (
+        <div>
+          <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+            Service days ({b.serviceDays.length})
+          </p>
+          <ul className="space-y-1.5">
+            {b.serviceDays.map((d, i) => (
+              <li key={i} className="flex items-center justify-between text-sm">
+                <span className="font-mono text-xs text-slate-400">{date(d.startAt)}</span>
+                <Badge value={d.status} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {refund && (
+        <div className="card p-4 bg-ink-800/50">
+          <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+            Refund preview (if cancelled now)
+          </p>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div><span className="text-slate-500">Refund</span><p className="font-mono">{money(refund.refund)}</p></div>
+            <div><span className="text-slate-500">Penalty</span><p className="font-mono">{money(refund.penalty)}</p></div>
+            <div><span className="text-slate-500">Band</span><p className="text-xs">{refund.band || '—'}</p></div>
+          </div>
+        </div>
+      )}
+
+      {extra?.payments?.length > 0 && (
+        <div>
+          <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">Payments</p>
+          <ul className="space-y-1.5">
+            {extra.payments.map((p) => (
+              <li key={p._id} className="flex items-center justify-between text-sm">
+                <span className="font-mono text-xs text-slate-500">{humanize(p.kind)}</span>
+                <span className="font-mono text-xs">{money(p.amount)}</span>
+                <Badge value={p.status} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

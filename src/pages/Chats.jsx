@@ -42,13 +42,13 @@ export default function Chats() {
   const threadColumns = [
     { key: 'family', header: 'Family', render: (r) => (
       <div>
-        <p className="font-medium text-slate-900">{r.family?.fullName || '—'}</p>
+        <p className="font-medium text-slate-100">{r.family?.fullName || '—'}</p>
         <p className="text-xs text-slate-500">{r.family?.phone}</p>
       </div>
     ) },
     { key: 'nanny', header: 'Nanny', render: (r) => (
       <div>
-        <p className="font-medium text-slate-900">{r.nanny?.fullName || '—'}</p>
+        <p className="font-medium text-slate-100">{r.nanny?.fullName || '—'}</p>
         <p className="text-xs text-slate-500">{r.nanny?.phone}</p>
       </div>
     ) },
@@ -68,7 +68,7 @@ export default function Chats() {
       <p className="max-w-md truncate text-xs">{r.body || (r.mediaUrl ? '📎 media' : '—')}</p>
     ) },
     { key: 'state', header: 'State', render: (r) => (
-      <code className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{r.state || '—'}</code>
+      <code className="text-[10px] bg-ink-800 px-1.5 py-0.5 rounded text-slate-400">{r.state || '—'}</code>
     ) },
     { key: 'createdAt', header: 'Time', render: (r) => dateTime(r.createdAt) },
   ];
@@ -119,7 +119,7 @@ export default function Chats() {
       >
         {selected && (
           <div className="space-y-3">
-            <div className="flex justify-between text-xs text-slate-500 pb-2 border-b border-slate-200">
+            <div className="flex justify-between text-xs text-slate-500 pb-2 border-b border-ink-800">
               <span>👨‍👩‍👧 {selected.family?.fullName}</span>
               <span>👩 {selected.nanny?.fullName}</span>
             </div>
@@ -132,7 +132,7 @@ export default function Chats() {
                   <div key={m._id}
                     className={`rounded-lg p-2.5 text-xs max-w-[80%] ${
                       m.from === 'family'
-                        ? 'bg-slate-100 text-slate-800'
+                        ? 'bg-ink-800 text-slate-300'
                         : 'bg-brand-50 text-brand-900 ml-auto'
                     }`}>
                     <p className="whitespace-pre-wrap">{m.body}</p>

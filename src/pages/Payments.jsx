@@ -1,159 +1,144 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../lib/api.js';
 import {
-  PageHeader, Table, Badge, Pagination, Tabs, StatCard, ErrorBox,
-  useToast, money, date, dateTime, humanize,
+  PageHeader, Table, Badge, Tabs, StatCard, Pagination,
+  useToast, ErrorBox, money, date, humanize,
 } from '../components/ui.jsx';
+import { IconPayments, IconDollar, IconClock, IconRefresh } from '../components/icons.jsx';
 
-const PAYMENT_TABS = [
-  { value: '', label: 'All' },
-  { value: 'payment_completed', label: 'Completed' },
-  { value: 'payment_in_process', label: 'In Process' },
-  { value: 'refund_in_process', label: 'Refund In Process' },
-  { value: 'refunded', label: 'Refunded' },
-  { value: 'payment_failed', label: 'Failed' },
-];
-
-const PAYOUT_TABS = [
-  { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'final_payment_done', label: 'Final Done' },
-  { value: 'failed', label: 'Failed' },
+const TABS = [
+  { value: 'family', label: 'Family Payments' },
+  { value: 'nanny', label: 'Nanny Payments' },
+  { value: 'refunds', label: 'Refunds' },
 ];
 
 export default function Payments() {
-  const [view, setView] = useState('incoming');   // incoming = families, outgoing = nannies
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState(null);
+  const { toast, notify, error: toastError } = useToast();
+  const [tab, setTab] = useState('family');
   const [summary, setSummary] = useState(null);
+  const [data, setData] = useState({ items: [], total: 0, pages: 0 });
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const { toast, notify, error: notifyError } = useToast();
+  const [error, setError] = useState(null);
 
-  const load = useCallback(() => {
+  const load = () => {
     setLoading(true);
-    setError('');
-    const path = view === 'incoming' ? '/payments' : '/payouts';
-    api(path, { params: { status, page, limit: 20 } })
-      .then(setData)
+    const qs = new URLSearchParams({ page, limit: 25 });
+    // Nanny money lives in /payouts; family money and refunds in /payments.
+    if (tab === 'refunds') qs.set('kind', 'refund');
+    const path = tab === 'nanny' ? '/payouts' : '/payments';
+
+    Promise.all([api(`${path}?${qs}`), api('/payments/summary')])
+      .then(([rows, s]) => { setData(rows); setSummary(s); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [view, status, page]);
+  };
 
-  useEffect(load, [load]);
-  useEffect(() => { api('/payments/summary').then(setSummary).catch(() => {}); }, []);
+  useEffect(load, [tab, page]);
 
-  const releaseAll = async () => {
-    if (!window.confirm('Release all payouts that are due now?')) return;
+  const release = async (id) => {
     try {
-      const res = await api('/payouts/release', { method: 'POST' });
-      notify(`Released ${res.released} payout(s).`);
+      await api(`/payouts/${id}/release`, { method: 'POST' });
+      notify('Payout released.');
       load();
     } catch (e) {
-      notifyError(e.message);
+      toastError(e.message);
     }
   };
 
-  const paymentColumns = [
-    { key: 'reference', header: 'Reference', render: (r) => (
-      <div>
-        <p className="font-medium text-slate-900">{r.reference}</p>
-        <p className="text-xs text-slate-500">{humanize(r.kind)}</p>
-      </div>
-    ) },
-    { key: 'family', header: 'Family', render: (r) => r.family?.fullName || '—' },
-    { key: 'booking', header: 'Booking', render: (r) => r.booking ? `#${r.booking.bookingNumber}` : '—' },
-    { key: 'amount', header: 'Amount', render: (r) => money(r.amount) },
-    { key: 'method', header: 'Method', render: (r) => humanize(r.method) },
-    { key: 'status', header: 'Status', render: (r) => <Badge value={r.status} /> },
-    { key: 'createdAt', header: 'Date', render: (r) => dateTime(r.createdAt) },
+  const familyColumns = [
+    {
+      key: 'id', header: 'Payment ID',
+      render: (p) => <span className="font-mono text-xs text-brand-400">{p.reference || `PAY-${String(p._id).slice(-5).toUpperCase()}`}</span>,
+    },
+    {
+      key: 'booking', header: 'Booking ID',
+      render: (p) => <span className="font-mono text-xs">{p.booking?.bookingNumber ? `#${p.booking.bookingNumber}` : '—'}</span>,
+    },
+    { key: 'family', header: 'Family', render: (p) => p.family?.fullName || '—' },
+    { key: 'nanny', header: 'Nanny', render: (p) => p.booking?.nanny?.fullName || '—' },
+    { key: 'amount', header: 'Amount', render: (p) => <span className="font-mono text-xs">{money(p.amount)}</span> },
+    {
+      key: 'method', header: 'Method',
+      render: (p) => <span className="text-xs text-slate-400">{p.method ? humanize(p.method) : '—'}</span>,
+    },
+    { key: 'date', header: 'Date', render: (p) => <span className="font-mono text-xs">{date(p.createdAt)}</span> },
+    { key: 'status', header: 'Status', render: (p) => <Badge value={p.status} /> },
   ];
 
-  const payoutColumns = [
-    { key: 'reference', header: 'Reference', render: (r) => (
-      <div>
-        <p className="font-medium text-slate-900">{r.reference}</p>
-        {r.isFinalForBooking && <p className="text-xs text-emerald-600">Final payment</p>}
-      </div>
-    ) },
-    { key: 'nanny', header: 'Nanny', render: (r) => r.nanny?.fullName || '—' },
-    { key: 'booking', header: 'Booking', render: (r) => r.booking ? `#${r.booking.bookingNumber}` : '—' },
-    { key: 'amount', header: 'Amount', render: (r) => money(r.amount) },
-    { key: 'status', header: 'Status', render: (r) => <Badge value={r.status} /> },
-    { key: 'scheduledFor', header: 'Scheduled', render: (r) => date(r.scheduledFor) },
-    { key: 'releasedAt', header: 'Released', render: (r) => r.releasedAt ? date(r.releasedAt) : '—' },
+  const nannyColumns = [
+    {
+      key: 'id', header: 'Payout ID',
+      render: (p) => <span className="font-mono text-xs text-brand-400">{p.reference || `PO-${String(p._id).slice(-5).toUpperCase()}`}</span>,
+    },
+    {
+      key: 'booking', header: 'Booking ID',
+      render: (p) => <span className="font-mono text-xs">{p.booking?.bookingNumber ? `#${p.booking.bookingNumber}` : '—'}</span>,
+    },
+    { key: 'nanny', header: 'Nanny', render: (p) => p.nanny?.fullName || '—' },
+    { key: 'amount', header: 'Amount', render: (p) => <span className="font-mono text-xs">{money(p.amount)}</span> },
+    {
+      key: 'scheduled', header: 'Scheduled For',
+      render: (p) => <span className="font-mono text-xs">{date(p.scheduledFor)}</span>,
+    },
+    { key: 'status', header: 'Status', render: (p) => <Badge value={p.status} /> },
+    {
+      key: 'action', header: '',
+      render: (p) => (p.status === 'pending' ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); release(p._id); }}
+          className="text-xs font-medium text-brand-400 hover:text-brand-300"
+        >
+          Release
+        </button>
+      ) : null),
+    },
   ];
+
+  if (error) return <ErrorBox error={error} onRetry={load} />;
 
   return (
     <>
-      <PageHeader
-        title="Payments"
-        subtitle="Family payments in, nanny payouts out — released every Monday"
-        actions={view === 'outgoing' && (
-          <button className="btn-primary" onClick={releaseAll}>Release due payouts</button>
-        )}
-      />
+      <PageHeader title="Payments" subtitle="Global payment centre — family & nanny transactions" />
 
-      {/* Summary cards per the 8/11 spec update. */}
-      {summary && (
-        <div className="grid gap-4 sm:grid-cols-3 mb-6">
-          <StatCard
-            label="Family payments allocated this week"
-            value={money(summary.familyPaymentsThisWeek.total)}
-            hint={`${summary.familyPaymentsThisWeek.count} payment(s)`}
-            tone="positive" icon="💳"
-          />
-          <StatCard
-            label="Nanny payments allocated this week"
-            value={money(summary.nannyPaymentsThisWeek.total)}
-            hint={`${summary.nannyPaymentsThisWeek.count} payout(s)`}
-            tone="brand" icon="👩"
-          />
-          <StatCard
-            label="Delete pending Nanny"
-            value={summary.deletePendingNanny.count}
-            hint="Nannies awaiting verification"
-            tone={summary.deletePendingNanny.count > 0 ? 'warn' : 'default'} icon="⏳"
-          />
-        </div>
-      )}
-
-      <div className="flex gap-2 mb-4">
-        <button
-          className={view === 'incoming' ? 'btn-primary' : 'btn-ghost'}
-          onClick={() => { setView('incoming'); setStatus(''); setPage(1); }}
-        >
-          Family Payments
-        </button>
-        <button
-          className={view === 'outgoing' ? 'btn-primary' : 'btn-ghost'}
-          onClick={() => { setView('outgoing'); setStatus(''); setPage(1); }}
-        >
-          Nanny Payouts
-        </button>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+        <StatCard
+          label="Family Payments Allocated This Week"
+          value={money(summary?.familyPaymentsThisWeek?.total)}
+          hint={`${summary?.familyPaymentsThisWeek?.count || 0} transactions`}
+          icon={<IconPayments size={17} />} tone="blue"
+        />
+        <StatCard
+          label="Nanny Payments Allocated This Week"
+          value={money(summary?.nannyPaymentsThisWeek?.total)}
+          hint={`${summary?.nannyPaymentsThisWeek?.count || 0} pending/done`}
+          icon={<IconDollar size={17} />} tone="emerald"
+        />
+        <StatCard
+          label="Nanny Payments to Be Released Next Monday"
+          value={money(summary?.nextMondayRelease?.total)}
+          hint={summary?.nextMondayRelease?.date
+            ? `${summary.nextMondayRelease.count} awaiting ${date(summary.nextMondayRelease.date)}`
+            : 'awaiting Monday release'}
+          icon={<IconClock size={17} />} tone="amber"
+        />
+        <StatCard
+          label="Refunds In Process"
+          value={summary?.refundsInProcess?.count ?? 0}
+          hint={`${money(summary?.refundsInProcess?.total)} total`}
+          icon={<IconRefresh size={17} />} tone="violet"
+        />
       </div>
 
-      <Tabs
-        tabs={view === 'incoming' ? PAYMENT_TABS : PAYOUT_TABS}
-        active={status}
-        onChange={(v) => { setStatus(v); setPage(1); }}
-      />
+      <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
 
-      <ErrorBox error={error} onRetry={load} />
-      {!error && (
-        <>
-          <Table
-            columns={view === 'incoming' ? paymentColumns : payoutColumns}
-            rows={data?.items}
-            loading={loading}
-            empty="No records found."
-          />
-          <Pagination page={data?.page} pages={data?.pages} total={data?.total} onChange={setPage} />
-        </>
-      )}
+      <Table
+        columns={tab === 'nanny' ? nannyColumns : familyColumns}
+        rows={data.items || []}
+        loading={loading}
+        empty={tab === 'refunds' ? 'No refunds yet.' : 'No transactions yet.'}
+      />
+      <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
 
       {toast}
     </>

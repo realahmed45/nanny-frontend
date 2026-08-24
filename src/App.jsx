@@ -11,6 +11,8 @@ import Payments from './pages/Payments.jsx';
 import Support from './pages/Support.jsx';
 import Chats from './pages/Chats.jsx';
 import Settings from './pages/Settings.jsx';
+import Calendar from './pages/Calendar.jsx';
+import Referrals from './pages/Referrals.jsx';
 
 export default function App() {
   const [admin, setAdmin] = useState(null);
@@ -34,7 +36,7 @@ export default function App() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-400">
+      <div className="min-h-screen flex items-center justify-center text-slate-500 bg-ink-950">
         Loading…
       </div>
     );
@@ -50,8 +52,10 @@ export default function App() {
           <Route path="bookings" element={<Bookings />} />
           <Route path="nannies" element={<Nannies />} />
           <Route path="families" element={<Families />} />
+          <Route path="calendar" element={<Calendar />} />
           <Route path="payments" element={<Payments />} />
           <Route path="support" element={<Support />} />
+          <Route path="referrals" element={<Referrals />} />
           <Route path="chats" element={<Chats />} />
           <Route path="settings" element={<Settings admin={admin} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

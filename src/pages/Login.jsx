@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { login, setToken } from '../lib/api.js';
+import { IconNanny } from '../components/icons.jsx';
 
 export default function Login({ onSuccess }) {
   const [email, setEmail] = useState('');
@@ -23,7 +24,7 @@ export default function Login({ onSuccess }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-brand-50 to-slate-100">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-ink-950">
       <div className="card w-full max-w-md p-8">
         <div className="text-center mb-7">
           <div className="text-4xl mb-2">👶</div>
@@ -50,7 +51,7 @@ export default function Login({ onSuccess }) {
           </div>
 
           {error && (
-            <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-sm text-red-300 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">{error}</p>
           )}
 
           <button type="submit" className="btn-primary w-full" disabled={busy}>
