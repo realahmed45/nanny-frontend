@@ -105,6 +105,58 @@ export default function Settings({ admin }) {
           </p>
         </Panel>
 
+        <Panel title="Bank Details (shown to families)">
+          {s.bankConfigured ? (
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Bank">{s.bank?.name}</Field>
+              <Field label="Account name">{s.bank?.accountName}</Field>
+              <Field label="Account number">
+                <span className="font-mono text-xs">{s.bank?.accountNumber || '—'}</span>
+              </Field>
+              <Field label="IBAN"><span className="font-mono text-xs">{s.bank?.iban || '—'}</span></Field>
+              {s.bank?.instructions && (
+                <div className="col-span-2"><Field label="Instructions">{s.bank.instructions}</Field></div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-start gap-3">
+              <span className="text-amber-400 mt-0.5"><IconX size={18} /></span>
+              <div>
+                <p className="text-sm text-slate-200">Not configured</p>
+                <p className="text-xs text-slate-500">
+                  Families cannot be told where to transfer. Set BANK_ACCOUNT_NAME,
+                  BANK_ACCOUNT_NUMBER and BANK_NAME on the server.
+                </p>
+              </div>
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Email (verification codes)">
+          <div className="flex items-start gap-3">
+            {s.emailConfigured ? (
+              <>
+                <span className="text-emerald-400 mt-0.5"><IconCheck size={18} /></span>
+                <div>
+                  <p className="text-sm text-slate-200">SMTP connected</p>
+                  <p className="text-xs text-slate-500">Verification codes are emailed to users.</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="text-amber-400 mt-0.5"><IconX size={18} /></span>
+                <div>
+                  <p className="text-sm text-slate-200">Not configured</p>
+                  <p className="text-xs text-slate-500">
+                    Codes are logged to the server console, so nobody can verify their
+                    account. Set SMTP_HOST and credentials on the server.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </Panel>
+
         <Panel title="Admin Account">
           <div className="grid grid-cols-2 gap-4">
             <Field label="Name">{admin?.name || '—'}</Field>
