@@ -138,7 +138,7 @@ export default function Settings({ admin }) {
               <>
                 <span className="text-emerald-400 mt-0.5"><IconCheck size={18} /></span>
                 <div>
-                  <p className="text-sm text-slate-200">SMTP connected</p>
+                  <p className="text-sm text-slate-200">{s.emailProvider || 'Connected'}</p>
                   <p className="text-xs text-slate-500">Verification codes are emailed to users.</p>
                 </div>
               </>
@@ -149,7 +149,7 @@ export default function Settings({ admin }) {
                   <p className="text-sm text-slate-200">Not configured</p>
                   <p className="text-xs text-slate-500">
                     Codes are logged to the server console, so nobody can verify their
-                    account. Set SMTP_HOST and credentials on the server.
+                    account. Set RESEND_API_KEY (or SMTP_HOST) and credentials on the server.
                   </p>
                 </div>
               </>
