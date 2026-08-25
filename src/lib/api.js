@@ -22,7 +22,9 @@ export async function api(path, { method = 'GET', body, params } = {}) {
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(url.pathname + url.search, {
+  // Send the absolute URL: in production VITE_API_BASE points at another
+  // origin (Render), and dropping it would post to the static host instead.
+  const res = await fetch(url.toString(), {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
