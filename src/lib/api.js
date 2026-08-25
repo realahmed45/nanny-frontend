@@ -1,4 +1,23 @@
-const BASE = import.meta.env.VITE_API_BASE || '/api/admin';
+/**
+ * Where the admin API lives.
+ *
+ * VITE_API_BASE wins when set. Otherwise we fall back to the deployed backend
+ * in a production build, and to the Vite dev proxy when running locally — so
+ * the dashboard works out of the box without any environment configuration.
+ *
+ * Whatever the source, a trailing slash and a stray "/auth/login" suffix are
+ * trimmed: the value is a base that request paths get appended to, and both
+ * are easy mistakes to make in a hosting dashboard.
+ */
+const DEFAULT_PROD_API = 'https://nanny-backend-hw1q.onrender.com/api/admin';
+
+const rawBase = import.meta.env.VITE_API_BASE
+  || (import.meta.env.PROD ? DEFAULT_PROD_API : '/api/admin');
+
+const BASE = String(rawBase)
+  .trim()
+  .replace(/\/+$/, '')
+  .replace(/\/auth\/login$/, '');
 const TOKEN_KEY = 'mynanny_admin_token';
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
