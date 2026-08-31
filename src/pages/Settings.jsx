@@ -13,6 +13,8 @@ export default function Settings({ admin }) {
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [emailTest, setEmailTest] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -39,6 +41,20 @@ export default function Settings({ admin }) {
       toastError(err.message);
     } finally {
       setSending(false);
+    }
+  };
+
+  // Surface the provider's own error rather than a generic failure, since a
+  // rejected send blocks every signup and the reason matters.
+  const testEmail = async () => {
+    setTesting(true);
+    setEmailTest(null);
+    try {
+      setEmailTest(await api('/settings/test-email', { method: 'POST', body: {} }));
+    } catch (err) {
+      setEmailTest({ ok: false, error: err.message });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -155,6 +171,24 @@ export default function Settings({ admin }) {
               </>
             )}
           </div>
+
+          <button className="btn-ghost mt-4 text-xs" onClick={testEmail} disabled={testing}>
+            {testing ? 'Sending…' : 'Send a test email'}
+          </button>
+          {emailTest && (
+            <div className={`mt-3 text-xs rounded-lg p-3 border ${
+              emailTest.ok
+                ? 'bg-emerald-950/30 border-emerald-900 text-emerald-300'
+                : 'bg-red-950/30 border-red-900 text-red-300'
+            }`}>
+              <p className="font-medium">
+                {emailTest.ok ? `Sent to ${emailTest.to}` : `Failed: ${emailTest.error}`}
+              </p>
+              {(emailTest.hint || emailTest.note) && (
+                <p className="mt-1 opacity-80">{emailTest.hint || emailTest.note}</p>
+              )}
+            </div>
+          )}
         </Panel>
 
         <Panel title="Admin Account">
