@@ -16,6 +16,13 @@ const FILTERS = [
   { value: '', label: 'All' },
 ];
 
+/** Why the family is waiting on a call — the two paths look very different. */
+const REASON = {
+  no_nanny_found: { label: 'No match', tone: 'bg-red-500/10 text-red-300 border-red-500/40' },
+  agent_requested: { label: 'Agent help', tone: 'bg-violet-500/10 text-violet-300 border-violet-500/30' },
+  other: { label: 'Other', tone: 'bg-slate-500/10 text-slate-400 border-slate-500/30' },
+};
+
 const STATUS_TONE = {
   pending: 'open',
   in_progress: 'in_progress',
@@ -91,6 +98,15 @@ export default function Callbacks() {
       ),
     },
     {
+      key: 'reason', header: 'Why',
+      render: (r) => {
+        const meta = REASON[r.reason] || REASON.other;
+        return (
+          <span className={`badge ${meta.tone}`}>{meta.label}</span>
+        );
+      },
+    },
+    {
       key: 'when', header: 'Wanted For',
       render: (r) => (
         <span className="font-mono text-xs">
@@ -147,7 +163,7 @@ export default function Callbacks() {
     <>
       <PageHeader
         title="Call Straight Away"
-        subtitle="Families the bot could not match — everything they told us, ready to call"
+        subtitle="Families waiting on a call — no nanny matched, or they asked for an agent"
       />
 
       <div className="grid gap-4 sm:grid-cols-3 mb-6">
@@ -206,6 +222,9 @@ export default function Callbacks() {
                 <Badge value={STATUS_TONE[selected.status] || selected.status}>
                   {humanize(selected.status)}
                 </Badge>
+                <span className={`badge ${(REASON[selected.reason] || REASON.other).tone}`}>
+                  {(REASON[selected.reason] || REASON.other).label}
+                </span>
                 <span className={`text-xs ${selected.callWindow === 'morning' ? 'text-amber-400' : 'text-emerald-400'}`}>
                   {selected.callWindow === 'morning'
                     ? `Promised: 10:00 AM (${date(selected.promisedCallAt)})`
