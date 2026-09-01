@@ -13,6 +13,8 @@ import Chats from './pages/Chats.jsx';
 import Settings from './pages/Settings.jsx';
 import Calendar from './pages/Calendar.jsx';
 import Referrals from './pages/Referrals.jsx';
+import Callbacks from './pages/Callbacks.jsx';
+import Conversations from './pages/Conversations.jsx';
 
 export default function App() {
   const [admin, setAdmin] = useState(null);
@@ -49,6 +51,7 @@ export default function App() {
       <Routes>
         <Route element={<Layout admin={admin} />}>
           <Route index element={<Dashboard />} />
+          <Route path="callbacks" element={<Callbacks />} />
           <Route path="bookings" element={<Bookings />} />
           <Route path="nannies" element={<Nannies />} />
           <Route path="families" element={<Families />} />
@@ -56,6 +59,7 @@ export default function App() {
           <Route path="payments" element={<Payments />} />
           <Route path="support" element={<Support />} />
           <Route path="referrals" element={<Referrals />} />
+          <Route path="conversations" element={<Conversations />} />
           <Route path="chats" element={<Chats />} />
           <Route path="settings" element={<Settings admin={admin} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

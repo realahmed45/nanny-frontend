@@ -4,19 +4,20 @@ import api, { clearToken } from '../lib/api.js';
 import {
   IconDashboard, IconNanny, IconFamily, IconBookings, IconCalendar,
   IconPayments, IconSupport, IconReferrals, IconSettings, IconChats,
-  IconSearch, IconBell, IconMenu,
+  IconSearch, IconBell, IconMenu, IconPhone,
 } from './icons.jsx';
 
 const NAV = [
   { to: '/', label: 'Dashboard', Icon: IconDashboard, end: true },
   { to: '/nannies', label: 'Nannies', Icon: IconNanny, count: 'nannies' },
   { to: '/families', label: 'Families', Icon: IconFamily },
+  { to: '/callbacks', label: 'Call Straight Away', Icon: IconPhone, count: 'callbacks' },
   { to: '/bookings', label: 'Bookings', Icon: IconBookings, count: 'bookings' },
   { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
   { to: '/payments', label: 'Payments', Icon: IconPayments, count: 'payments' },
   { to: '/support', label: 'Support Tickets', Icon: IconSupport, count: 'tickets' },
   { to: '/referrals', label: 'Referrals', Icon: IconReferrals },
-  { to: '/chats', label: 'Chats', Icon: IconChats },
+  { to: '/conversations', label: 'Conversations', Icon: IconChats },
   { to: '/settings', label: 'Settings', Icon: IconSettings },
 ];
 
@@ -45,6 +46,7 @@ export default function Layout({ admin }) {
             bookings: s.bookings?.replacementNeeded || 0,
             payments: s.revenue?.pendingCount || 0,
             tickets: s.support?.openTickets || 0,
+            callbacks: s.callbacks?.pending || 0,
           });
         })
         .catch(() => {});
