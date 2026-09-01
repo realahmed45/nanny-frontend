@@ -105,7 +105,22 @@ export default function Bookings() {
       key: 'time', header: 'Time',
       render: (b) => <span className="font-mono text-xs">{timeRange(b.startTime, b.hoursPerDay)}</span>,
     },
-    { key: 'type', header: 'Type', render: (b) => (b.isMultiDay ? 'Multiple Days' : 'Single Day') },
+    {
+      key: 'type', header: 'Type',
+      render: (b) => (
+        <span className="flex items-center gap-1.5">
+          {b.isMultiDay ? 'Multiple Days' : 'Single Day'}
+          {b.isEmergency && (
+            <span
+              title="Emergency — needed same day"
+              className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 text-[10px] font-mono border border-red-500/40"
+            >
+              URGENT
+            </span>
+          )}
+        </span>
+      ),
+    },
     { key: 'status', header: 'Status', render: (b) => <Badge value={statusOf(b)} /> },
     { key: 'arrival', header: 'Arrival OTP', render: (b) => <OtpCell booking={b} kind="arrival" /> },
     { key: 'end', header: 'End OTP', render: (b) => <OtpCell booking={b} kind="end" /> },
