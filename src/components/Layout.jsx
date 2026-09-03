@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import api, { clearToken } from '../lib/api.js';
+import { setCurrency } from './ui.jsx';
 import {
   IconDashboard, IconNanny, IconFamily, IconBookings, IconCalendar,
   IconPayments, IconSupport, IconReferrals, IconSettings, IconChats,
@@ -51,6 +52,8 @@ export default function Layout({ admin }) {
         })
         .catch(() => {});
     load();
+    // The platform currency drives every money value on screen.
+    api('/settings').then((s) => setCurrency(s.currency)).catch(() => {});
     const t = setInterval(load, 60000);
     return () => { alive = false; clearInterval(t); };
   }, []);

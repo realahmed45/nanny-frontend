@@ -97,10 +97,27 @@ export const humanize = (s) =>
  * Formatting
  * ------------------------------------------------------------------ */
 
-export const money = (n, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency', currency, maximumFractionDigits: 0,
-  }).format(Number(n || 0));
+/**
+ * The platform currency, read once from /settings and cached.
+ *
+ * The dashboard renders money in many places; threading a currency prop
+ * through each of them would be noise, and hardcoding USD showed the wrong
+ * symbol everywhere the moment the platform switched to rupiah.
+ */
+let activeCurrency = 'USD';
+export const setCurrency = (c) => { if (c) activeCurrency = c; };
+
+export const money = (n, currency = activeCurrency) => {
+  const value = Number(n || 0);
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency, maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    // An unknown code would otherwise throw and blank the cell.
+    return `${currency} ${value.toLocaleString('en-US')}`;
+  }
+};
 
 export const date = (d) =>
   d ? new Date(d).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';

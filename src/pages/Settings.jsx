@@ -104,7 +104,7 @@ export default function Settings({ admin }) {
 
         <Panel title="Business Rules">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Currency">{s.currency || 'USD'}</Field>
+            <Field label="Currency">{s.currency || '—'}</Field>
             <Field label="Transport Fee">
               {s.transportFee
                 ? `${s.transportFee.min.toLocaleString()} – ${s.transportFee.max.toLocaleString()} ${s.currency || ''}`.trim()
