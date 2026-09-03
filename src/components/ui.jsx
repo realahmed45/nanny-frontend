@@ -202,34 +202,116 @@ export function StatCard({ label, value, hint, icon, tone = 'default' }) {
   );
 }
 
-export function Table({ columns, rows, empty = 'No records found.', onRowClick, loading, dense }) {
+/**
+ * A checkbox that can also show a partial state, for "some rows selected".
+ * Rendered rather than using indeterminate, which cannot be set declaratively.
+ */
+function SelectBox({ checked, partial, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={partial ? 'mixed' : checked}
+      aria-label={label}
+      onClick={(e) => { e.stopPropagation(); onChange(!checked); }}
+      className={`w-4 h-4 rounded border grid place-items-center transition-colors ${
+        checked || partial
+          ? 'bg-brand-600 border-brand-600'
+          : 'border-ink-600 hover:border-slate-500'
+      }`}
+    >
+      {partial ? (
+        <span className="w-2 h-0.5 bg-white rounded" />
+      ) : checked ? (
+        <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="white" strokeWidth="2">
+          <path d="M2 6.5 4.5 9 10 3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : null}
+    </button>
+  );
+}
+
+/**
+ * `selectable` turns on a leading checkbox column. The parent owns the
+ * selection so it can act on it — the table only reports what changed.
+ */
+export function Table({
+  columns, rows, empty = 'No records found.', onRowClick, loading, dense,
+  selectable = false, selected = [], onSelectionChange,
+}) {
   if (loading) return <Skeleton rows={5} />;
   if (!rows?.length) {
     return <div className="card p-12 text-center text-sm text-slate-500">{empty}</div>;
   }
+
+  const ids = rows.map((r) => String(r._id));
+  const selectedSet = new Set(selected.map(String));
+  const shown = ids.filter((id) => selectedSet.has(id));
+  const allShown = shown.length === ids.length && ids.length > 0;
+
+  const toggleAll = (next) => {
+    if (!onSelectionChange) return;
+    // Only the rows on screen change; a selection made on another page stays.
+    const others = selected.map(String).filter((id) => !ids.includes(id));
+    onSelectionChange(next ? [...others, ...ids] : others);
+  };
+
+  const toggleRow = (id, next) => {
+    if (!onSelectionChange) return;
+    const asStrings = selected.map(String);
+    onSelectionChange(next ? [...asStrings, id] : asStrings.filter((x) => x !== id));
+  };
+
   return (
     <div className="card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="border-b border-ink-800">
-            <tr>{columns.map((c) => (
-              <th key={c.key} className={`th whitespace-nowrap ${dense ? 'px-2.5' : ''}`}>{c.header}</th>
-            ))}</tr>
+            <tr>
+              {selectable && (
+                <th className={`th w-8 ${dense ? 'px-2.5' : ''}`}>
+                  <SelectBox
+                    checked={allShown}
+                    partial={shown.length > 0 && !allShown}
+                    onChange={toggleAll}
+                    label="Select all rows"
+                  />
+                </th>
+              )}
+              {columns.map((c) => (
+                <th key={c.key} className={`th whitespace-nowrap ${dense ? 'px-2.5' : ''}`}>{c.header}</th>
+              ))}
+            </tr>
           </thead>
           <tbody className="divide-y divide-ink-800">
-            {rows.map((row, i) => (
-              <tr
-                key={row._id || i}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={onRowClick ? 'cursor-pointer transition-colors hover:bg-ink-800/60' : undefined}
-              >
-                {columns.map((c) => (
-                  <td key={c.key} className={`td ${dense ? 'px-2.5 py-3' : ''}`}>
-                    {c.render ? c.render(row) : row[c.key] ?? '—'}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {rows.map((row, i) => {
+              const id = String(row._id);
+              const isSelected = selectedSet.has(id);
+              return (
+                <tr
+                  key={row._id || i}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={`${onRowClick ? 'cursor-pointer transition-colors hover:bg-ink-800/60' : ''} ${
+                    isSelected ? 'bg-brand-600/10' : ''
+                  }`}
+                >
+                  {selectable && (
+                    <td className={`td w-8 ${dense ? 'px-2.5 py-3' : ''}`}>
+                      <SelectBox
+                        checked={isSelected}
+                        onChange={(next) => toggleRow(id, next)}
+                        label="Select row"
+                      />
+                    </td>
+                  )}
+                  {columns.map((c) => (
+                    <td key={c.key} className={`td ${dense ? 'px-2.5 py-3' : ''}`}>
+                      {c.render ? c.render(row) : row[c.key] ?? '—'}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

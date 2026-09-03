@@ -27,6 +27,8 @@ export default function Payments() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const [proofUrl, setProofUrl] = useState('');
+  const [checkedIds, setCheckedIds] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -43,6 +45,7 @@ export default function Payments() {
       .finally(() => setLoading(false));
   };
 
+  useEffect(() => { setCheckedIds([]); }, [tab, page]);
   useEffect(load, [tab, page]);
 
   const open = (row) => {
@@ -88,6 +91,30 @@ export default function Payments() {
     `/payouts/${selected._id}/mark-paid`, { proofUrl, note },
     'Payout marked as transferred.',
   );
+
+  const approveSelected = async () => {
+    if (!checkedIds.length) return;
+    setBulkBusy(true);
+    try {
+      const res = await api('/payments/bulk-approve', {
+        method: 'POST',
+        body: { ids: checkedIds, note: 'Bulk approved from dashboard' },
+      });
+      // Say what actually happened: a silent partial success is worse than
+      // none, since the admin would assume the whole batch went through.
+      notify(
+        res.skippedCount
+          ? `Approved ${res.approvedCount}, skipped ${res.skippedCount}.`
+          : `Approved ${res.approvedCount} payment${res.approvedCount === 1 ? '' : 's'}.`,
+      );
+      setCheckedIds([]);
+      load();
+    } catch (e) {
+      toastError(e.message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const paymentColumns = [
     {
@@ -194,11 +221,34 @@ export default function Payments() {
 
       <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
 
+      {/* Only the review queue can be bulk-approved: the other tabs are
+          history, and a payout needs its own proof of transfer. */}
+      {tab === 'review' && checkedIds.length > 0 && (
+        <div className="card p-3 mb-3 flex flex-wrap items-center gap-3 border-brand-600/40 bg-brand-600/10">
+          <span className="text-sm text-slate-200">
+            {checkedIds.length} payment{checkedIds.length === 1 ? '' : 's'} selected
+          </span>
+          <button
+            className="btn-primary ml-auto"
+            onClick={approveSelected}
+            disabled={bulkBusy}
+          >
+            <IconCheck size={14} /> {bulkBusy ? 'Approving…' : `Approve ${checkedIds.length}`}
+          </button>
+          <button className="btn-ghost" onClick={() => setCheckedIds([])} disabled={bulkBusy}>
+            Clear
+          </button>
+        </div>
+      )}
+
       <Table
         columns={isPayout ? payoutColumns : paymentColumns}
         rows={data.items || []}
         loading={loading}
         onRowClick={open}
+        selectable={tab === 'review'}
+        selected={checkedIds}
+        onSelectionChange={setCheckedIds}
         dense
         empty={
           tab === 'review' ? 'Nothing waiting for review — all transfers are verified.'
