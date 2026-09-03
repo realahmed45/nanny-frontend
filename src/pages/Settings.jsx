@@ -13,6 +13,7 @@ export default function Settings({ admin }) {
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [savingVoice, setSavingVoice] = useState(false);
   const [testing, setTesting] = useState(false);
   const [emailTest, setEmailTest] = useState(null);
 
@@ -55,6 +56,23 @@ export default function Settings({ admin }) {
       setEmailTest({ ok: false, error: err.message });
     } finally {
       setTesting(false);
+    }
+  };
+
+  /** Runtime switches save immediately — there is no Save button to miss. */
+  const toggleVoice = async (next) => {
+    setSavingVoice(true);
+    // Reflect the change straight away; the reload below confirms it.
+    setSettings((prev) => ({ ...prev, voiceTranscription: next }));
+    try {
+      await api('/settings', { method: 'PATCH', body: { voiceTranscription: next } });
+      notify(next ? 'Voice messages will be transcribed.' : 'Voice messages are now ignored.');
+      load();
+    } catch (e) {
+      toastError(e.message);
+      load();   // put the switch back if the save failed
+    } finally {
+      setSavingVoice(false);
     }
   };
 
@@ -146,6 +164,71 @@ export default function Settings({ admin }) {
               </div>
             </div>
           )}
+        </Panel>
+
+        <Panel title="Voice Messages">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm text-slate-200">
+                {s.voiceTranscription ? 'Transcription is on' : 'Transcription is off'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {s.voiceTranscription
+                  ? 'Voice notes are converted to text and answered like any other reply.'
+                  : 'Voice notes are not read; families are asked to type instead.'}
+              </p>
+            </div>
+
+            {/* A switch rather than a checkbox: this is a live setting, and it
+                is worth it being obvious which way it is pointing. */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(s.voiceTranscription)}
+              aria-label="Transcribe voice messages"
+              disabled={savingVoice}
+              onClick={() => toggleVoice(!s.voiceTranscription)}
+              className={`relative w-12 h-6 rounded-full shrink-0 transition-colors disabled:opacity-50 ${
+                s.voiceTranscription ? 'bg-emerald-500' : 'bg-ink-700'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                  s.voiceTranscription ? 'translate-x-6' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-ink-800">
+            {s.voiceConfigured ? (
+              <div className="flex items-start gap-3">
+                <span className="text-emerald-400 mt-0.5"><IconCheck size={18} /></span>
+                <div>
+                  <p className="text-sm text-slate-200">
+                    Speech-to-text ready
+                    {s.voiceProvider && (
+                      <span className="text-slate-500"> · {s.voiceProvider}</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Transcripts appear in Conversations marked with a microphone.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3">
+                <span className="text-amber-400 mt-0.5"><IconX size={18} /></span>
+                <div>
+                  <p className="text-sm text-slate-200">No speech-to-text key</p>
+                  <p className="text-xs text-slate-500">
+                    Even with the switch on, voice notes cannot be read until
+                    GROQ_API_KEY (free tier) or OPENAI_API_KEY is set on the server.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </Panel>
 
         <Panel title="Email (verification codes)">
