@@ -174,7 +174,7 @@ export default function Callbacks() {
 
       <FilterPills options={FILTERS} active={filter} onChange={(v) => { setFilter(v); setPage(1); }} />
 
-      <Table
+      <Table startIndex={(page - 1) * 25}
         columns={columns}
         rows={data.items || []}
         loading={loading}

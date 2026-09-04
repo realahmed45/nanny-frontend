@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api.js';
+import Notes from '../components/Notes.jsx';
 import {
   PageHeader, Table, Badge, Modal, Field, Avatar, Pagination,
   useToast, ErrorBox, money, date, humanize,
@@ -50,10 +52,31 @@ export default function Nannies() {
     return () => clearTimeout(t);
   }, [search, status, page]);
 
+  const navigate = useNavigate();
+
   const open = (n) => {
     setSelected(n);
     setDetail(null);
     api(`/nannies/${n._id}`).then(setDetail).catch(() => setDetail({ nanny: n }));
+  };
+
+  /** Approve, hide or delete one of her videos, then refresh the modal. */
+  const onVideo = async (video, { approved, remove }) => {
+    try {
+      if (remove) {
+        await api(`/nannies/${selected._id}/videos/${video._id}`, { method: 'DELETE' });
+        notify('Video deleted.');
+      } else {
+        await api(`/nannies/${selected._id}/videos/${video._id}`, {
+          method: 'PATCH', body: { approved },
+        });
+        notify(approved ? 'Video is now visible to families.' : 'Video hidden from families.');
+      }
+      const fresh = await api(`/nannies/${selected._id}`);
+      setDetail(fresh);
+    } catch (e) {
+      toastError(e.message);
+    }
   };
 
   const act = async (path, label) => {
@@ -112,7 +135,7 @@ export default function Nannies() {
     },
     {
       key: 'rate', header: 'Rate',
-      render: (n) => <span className="font-mono text-xs">{n.hourlyRate ? `$${n.hourlyRate}/hr` : '—'}</span>,
+      render: (n) => <span className="font-mono text-xs">{n.hourlyRate ? `${money(n.hourlyRate)}/hr` : '—'}</span>,
     },
     {
       key: 'skills', header: 'Skills',
@@ -199,7 +222,7 @@ export default function Nannies() {
         </select>
       </div>
 
-      <Table columns={columns} rows={rows} loading={loading} onRowClick={open} dense empty="No nannies yet." />
+      <Table startIndex={(page - 1) * 25} columns={columns} rows={rows} loading={loading} onRowClick={open} dense empty="No nannies yet." />
       <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
 
       <Modal
@@ -221,7 +244,14 @@ export default function Nannies() {
           </>
         }
       >
-        {selected && <NannyDetail nanny={detail?.nanny || selected} extra={detail} />}
+        {selected && (
+          <NannyDetail
+            nanny={detail?.nanny || selected}
+            extra={detail}
+            onVideo={onVideo}
+            onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
+          />
+        )}
       </Modal>
 
       {toast}
@@ -229,7 +259,7 @@ export default function Nannies() {
   );
 }
 
-function NannyDetail({ nanny, extra }) {
+function NannyDetail({ nanny, extra, onBooking, onVideo }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -240,6 +270,81 @@ function NannyDetail({ nanny, extra }) {
         </div>
         <span className="ml-auto"><Badge value={nanny.nannyStatus} /></span>
       </div>
+
+      {/* What she has actually earned and worked, which is the first thing
+          anyone asks when they open a nanny. */}
+      {extra?.stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Total earned</div>
+            <div className="text-sm text-emerald-400 font-mono">
+              {money(extra.stats.totalEarned)}
+            </div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Awaiting payout</div>
+            <div className="text-sm text-amber-400 font-mono">
+              {money(extra.stats.pendingPayout)}
+            </div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Hours worked</div>
+            <div className="text-sm text-white font-mono">
+              {extra.stats.hoursWorked}h
+              <span className="text-xs text-slate-500"> · {extra.stats.daysWorked} days</span>
+            </div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Bookings</div>
+            <div className="text-sm text-white font-mono">
+              {extra.stats.bookingsCompleted}
+              <span className="text-xs text-slate-500"> of {extra.stats.bookingsTotal} completed</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Her introduction video. Families only see it once it is approved. */}
+      {nanny.videos?.length > 0 && (
+        <div>
+          <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+            Presentation videos
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {nanny.videos.map((v) => (
+              <div key={v._id || v.url} className="rounded-lg border border-ink-800 bg-ink-950/60 p-2">
+                <video
+                  src={v.url}
+                  poster={v.thumbnailUrl}
+                  controls
+                  preload="metadata"
+                  className="w-full rounded bg-black max-h-52"
+                />
+                <div className="flex items-center justify-between mt-2 px-1">
+                  <span className="text-xs text-slate-400">{v.title || 'Introduction'}</span>
+                  {v.approved
+                    ? <span className="text-xs text-emerald-400">Live to families</span>
+                    : <span className="text-xs text-amber-400">Awaiting review</span>}
+                </div>
+                <div className="flex gap-2 mt-2 px-1">
+                  <button
+                    className="btn-ghost text-xs"
+                    onClick={() => onVideo?.(v, { approved: !v.approved })}
+                  >
+                    {v.approved ? 'Hide from families' : 'Approve'}
+                  </button>
+                  <button
+                    className="btn-ghost text-xs text-red-400"
+                    onClick={() => onVideo?.(v, { remove: true })}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Field label="Hourly Rate">{nanny.hourlyRate ? money(nanny.hourlyRate) : '—'}</Field>
@@ -318,8 +423,12 @@ function NannyDetail({ nanny, extra }) {
           </p>
           <ul className="space-y-1.5">
             {extra.bookings.slice(0, 6).map((b) => (
-              <li key={b._id} className="flex items-center justify-between text-sm">
-                <span className="font-mono text-xs text-slate-500">#{b.bookingNumber}</span>
+              <li
+                key={b._id}
+                onClick={() => onBooking?.(b)}
+                className="flex items-center justify-between text-sm rounded px-2 py-1.5 -mx-2 cursor-pointer hover:bg-ink-800/60"
+              >
+                <span className="font-mono text-xs text-brand-400">#{b.bookingNumber}</span>
                 <span className="text-slate-400">{date(b.startDate)}</span>
                 <Badge value={b.status} />
               </li>
@@ -327,6 +436,8 @@ function NannyDetail({ nanny, extra }) {
           </ul>
         </div>
       )}
+
+      <Notes targetType="nanny" target={nanny._id} initial={extra?.notes || []} />
     </div>
   );
 }

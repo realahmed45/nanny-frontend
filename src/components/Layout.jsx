@@ -16,9 +16,12 @@ const NAV = [
   { to: '/bookings', label: 'Bookings', Icon: IconBookings, count: 'bookings' },
   { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
   { to: '/payments', label: 'Payments', Icon: IconPayments, count: 'payments' },
+  { to: '/pricing', label: 'Pricing', Icon: IconPayments },
   { to: '/support', label: 'Support Tickets', Icon: IconSupport, count: 'tickets' },
   { to: '/referrals', label: 'Referrals', Icon: IconReferrals },
+  { to: '/referral-engine', label: 'Referral Engine', Icon: IconReferrals },
   { to: '/conversations', label: 'Conversations', Icon: IconChats },
+  { to: '/activity', label: 'Activity Log', Icon: IconSupport },
   { to: '/settings', label: 'Settings', Icon: IconSettings },
 ];
 

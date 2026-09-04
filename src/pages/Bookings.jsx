@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api.js';
+import Notes from '../components/Notes.jsx';
 import {
-  PageHeader, Table, Badge, Modal, Field, FilterPills, Pagination,
-  useToast, ErrorBox, money, date, humanize,
+  PageHeader, Table, Badge, Modal, Field, FilterPills, Pagination, useToast, ErrorBox, money, date, humanize, dateTime,
 } from '../components/ui.jsx';
 import { IconEye, IconCheck, IconClock } from '../components/icons.jsx';
 
@@ -37,6 +38,10 @@ export default function Bookings() {
   const { toast, notify, error: toastError } = useToast();
   const [data, setData] = useState({ items: [], total: 0, pages: 0 });
   const [filter, setFilter] = useState('');
+  const [params, setParams] = useSearchParams();
+  // Seeded from the URL, so linking to a booking from a nanny or family opens
+  // this page already filtered to it.
+  const [search, setSearch] = useState(params.get('search') || '');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -49,13 +54,15 @@ export default function Bookings() {
     const qs = new URLSearchParams({ page, limit: 25 });
     // "Replacement needed" is a sub-status, so it filters client-side.
     if (filter && filter !== 'replacement_needed') qs.set('status', filter);
+    if (search.trim()) qs.set('search', search.trim());
     api(`/bookings?${qs}`)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [filter, page]);
+  useEffect(load, [filter, page, search]);
+  useEffect(() => { setPage(1); }, [search]);
 
   const open = (b) => {
     setSelected(b);
@@ -121,6 +128,25 @@ export default function Bookings() {
         </span>
       ),
     },
+    {
+      key: 'bookedAt', header: 'Booked',
+      render: (b) => (
+        <span className="font-mono text-xs text-slate-400">
+          {b.bookedAt || b.createdAt ? date(b.bookedAt || b.createdAt) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'nextService', header: 'Next Day',
+      render: (b) => (b.nextServiceDate ? (
+        <span className="font-mono text-xs text-violet-300">
+          {date(b.nextServiceDate)}
+          {b.remainingDays > 1 && (
+            <span className="text-slate-500"> +{b.remainingDays - 1}</span>
+          )}
+        </span>
+      ) : <span className="text-slate-600 text-xs">—</span>),
+    },
     { key: 'status', header: 'Status', render: (b) => <Badge value={statusOf(b)} /> },
     { key: 'arrival', header: 'Arrival OTP', render: (b) => <OtpCell booking={b} kind="arrival" /> },
     { key: 'end', header: 'End OTP', render: (b) => <OtpCell booking={b} kind="end" /> },
@@ -149,7 +175,21 @@ export default function Bookings() {
       <PageHeader title="All Bookings" subtitle={`${data.total} total bookings on platform`} />
       <FilterPills options={FILTERS} active={filter} onChange={(v) => { setFilter(v); setPage(1); }} />
 
-      <Table columns={columns} rows={rows} loading={loading} onRowClick={open} dense empty="No bookings yet." />
+      <div className="mb-4">
+        <input
+          className="input max-w-xs"
+          placeholder="Search by booking number…"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            // Keep the URL in step, so the view can be shared or reloaded.
+            if (e.target.value) setParams({ search: e.target.value }, { replace: true });
+            else setParams({}, { replace: true });
+          }}
+        />
+      </div>
+
+      <Table startIndex={(page - 1) * 25} columns={columns} rows={rows} loading={loading} onRowClick={open} dense empty="No bookings yet." />
       <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
 
       <Modal
@@ -210,6 +250,29 @@ function BookingDetail({ booking, extra, refund }) {
         <Badge value={b.paymentStatus} />
         <span className="ml-auto font-mono text-sm text-slate-300">{money(b.totalAmount)}</span>
       </div>
+
+      {extra?.timing && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Booked on</div>
+            <div className="text-sm text-white font-mono">{date(extra.timing.bookedAt)}</div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Next day</div>
+            <div className="text-sm text-violet-300 font-mono">
+              {extra.timing.nextServiceDate ? date(extra.timing.nextServiceDate) : '—'}
+            </div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Days remaining</div>
+            <div className="text-sm text-white font-mono">{extra.timing.remainingDays}</div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Days completed</div>
+            <div className="text-sm text-emerald-400 font-mono">{extra.timing.completedDays}</div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Field label="Family">{b.family?.fullName}</Field>
@@ -303,6 +366,27 @@ function BookingDetail({ booking, extra, refund }) {
           </ul>
         </div>
       )}
+
+      {/* What the system did, so a note can be read against the events it
+          was written about. */}
+      {extra?.history?.length > 0 && (
+        <div>
+          <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
+            History
+          </p>
+          <ul className="space-y-1">
+            {extra.history.slice(0, 12).map((h) => (
+              <li key={h._id} className="flex items-center gap-3 text-xs">
+                <span className="text-slate-500 w-36 shrink-0">{dateTime(h.createdAt)}</span>
+                <span className="font-mono text-slate-300 flex-1">{h.action}</span>
+                <span className="text-slate-500">{h.adminName || h.adminEmail || 'system'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <Notes targetType="booking" target={b._id} initial={extra?.notes || []} />
     </div>
   );
 }

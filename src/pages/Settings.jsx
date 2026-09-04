@@ -1,9 +1,117 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api.js';
 import {
-  PageHeader, Field, Badge, Skeleton, ErrorBox, useToast,
+  PageHeader, Field, Badge, Skeleton, ErrorBox, useToast, dateTime,
 } from '../components/ui.jsx';
 import { IconCheck, IconX, IconChats } from '../components/icons.jsx';
+
+/**
+ * Everyone who can sign in.
+ *
+ * Several people share this dashboard, so accounts are managed here rather
+ * than by hand in the database — and because the activity log names whoever
+ * acted, shared logins would make that record useless.
+ */
+function TeamPanel({ admin }) {
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'admin' });
+
+  const isSuper = admin?.role === 'super_admin';
+
+  const load = () => {
+    if (!isSuper) { setLoading(false); return; }
+    api('/admins')
+      .then((r) => setAdmins(r.items || []))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, [isSuper]);
+
+  const create = async (e) => {
+    e.preventDefault();
+    setAdding(true);
+    setError(null);
+    try {
+      await api('/admins', { method: 'POST', body: form });
+      setForm({ name: '', email: '', password: '', role: 'admin' });
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  if (!isSuper) {
+    return (
+      <p className="text-xs text-slate-500">
+        Only a super admin can add or see other accounts.
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      {loading ? (
+        <p className="text-xs text-slate-500">Loading…</p>
+      ) : (
+        <div className="space-y-2 mb-5">
+          {admins.map((a) => (
+            <div
+              key={a._id}
+              className="flex flex-wrap items-center gap-3 rounded-lg border border-ink-800 bg-ink-950/60 p-3"
+            >
+              <div className="flex-1 min-w-[160px]">
+                <div className="text-sm text-white">{a.name || '—'}</div>
+                <div className="text-xs font-mono text-slate-500">{a.email}</div>
+              </div>
+              <Badge value={a.role} />
+              <Badge value={a.active ? 'active' : 'suspended'} />
+              <div className="text-xs text-slate-500 w-40 text-right">
+                {a.lastLoginAt ? `last in ${dateTime(a.lastLoginAt)}` : 'never signed in'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={create} className="space-y-3 border-t border-ink-800 pt-4">
+        <p className="text-xs text-slate-500">Add someone to the team</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input
+            className="input" placeholder="Name" value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          />
+          <input
+            className="input" type="email" placeholder="Email" value={form.email} required
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          />
+          <input
+            className="input" type="password" placeholder="Password" value={form.password} required
+            minLength={8}
+            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+          />
+          <select
+            className="input" value={form.role}
+            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+          >
+            <option value="support">Support — read and reply, no money actions</option>
+            <option value="admin">Admin — approve payments and bookings</option>
+            <option value="super_admin">Super admin — everything, including accounts</option>
+          </select>
+        </div>
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        <button className="btn-primary text-xs" disabled={adding}>
+          {adding ? 'Adding…' : 'Add account'}
+        </button>
+      </form>
+    </div>
+  );
+}
 
 export default function Settings({ admin }) {
   const { toast, notify, error: toastError } = useToast();
@@ -280,6 +388,10 @@ export default function Settings({ admin }) {
             <Field label="Email"><span className="font-mono text-xs">{admin?.email}</span></Field>
             <Field label="Role"><Badge value={admin?.role} /></Field>
           </div>
+        </Panel>
+
+        <Panel title="Team & Access">
+          <TeamPanel admin={admin} />
         </Panel>
 
         <Panel title="Send a WhatsApp Message" icon={<IconChats size={16} />}>

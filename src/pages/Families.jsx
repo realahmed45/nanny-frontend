@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api.js';
+import Notes from '../components/Notes.jsx';
 import {
   PageHeader, Table, Badge, Modal, Field, Avatar, Pagination,
   useToast, ErrorBox, money, date,
@@ -37,6 +39,8 @@ export default function Families() {
     const t = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(t);
   }, [search, page]);
+
+  const navigate = useNavigate();
 
   const open = (f) => {
     setSelected(f);
@@ -158,7 +162,7 @@ export default function Families() {
         </select>
       </div>
 
-      <Table columns={columns} rows={rows} loading={loading} onRowClick={open} dense empty="No families yet." />
+      <Table startIndex={(page - 1) * 25} columns={columns} rows={rows} loading={loading} onRowClick={open} dense empty="No families yet." />
       <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
 
       <Modal
@@ -172,7 +176,13 @@ export default function Families() {
           </button>
         }
       >
-        {selected && <FamilyDetail family={detail?.family || selected} extra={detail} />}
+        {selected && (
+          <FamilyDetail
+            family={detail?.family || selected}
+            extra={detail}
+            onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
+          />
+        )}
       </Modal>
 
       {toast}
@@ -180,7 +190,7 @@ export default function Families() {
   );
 }
 
-function FamilyDetail({ family, extra }) {
+function FamilyDetail({ family, extra, onBooking }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -198,8 +208,43 @@ function FamilyDetail({ family, extra }) {
         <Field label="Joined">{date(family.createdAt)}</Field>
         <Field label="Referral Code"><span className="font-mono text-xs">{family.referralCode || '—'}</span></Field>
         <Field label="Referrals">{family.referralCount || 0}</Field>
-        <Field label="Total Spent">{money(extra?.stats?.spent ?? family.stats?.spent)}</Field>
+        <Field label="Total Spent">{money(extra?.stats?.totalSpent ?? 0)}</Field>
       </div>
+
+      {/* What this family is actually worth, and what they still owe. */}
+      {extra?.stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Paid</div>
+            <div className="text-sm text-emerald-400 font-mono">{money(extra.stats.totalPaid)}</div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Refunded</div>
+            <div className="text-sm text-amber-400 font-mono">{money(extra.stats.totalRefunded)}</div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Awaiting payment</div>
+            <div className="text-sm text-orange-400 font-mono">{money(extra.stats.pendingPayment)}</div>
+          </div>
+          <div className="rounded-lg bg-ink-950/60 border border-ink-800 p-3">
+            <div className="text-xs text-slate-500 mb-1">Care booked</div>
+            <div className="text-sm text-white font-mono">
+              {extra.stats.hoursBooked}h
+              <span className="text-xs text-slate-500"> · {extra.stats.bookingsTotal} bookings</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Who referred them in, so the chain can be walked from either end. */}
+      {extra?.referredBy && (
+        <Field label="Referred by">
+          <span className="text-slate-200">{extra.referredBy.fullName}</span>
+          <span className="font-mono text-xs text-slate-500 ml-2">
+            {extra.referredBy.referralCode}
+          </span>
+        </Field>
+      )}
 
       {family.children?.length > 0 && (
         <Field label="Children">
@@ -236,8 +281,12 @@ function FamilyDetail({ family, extra }) {
           <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">Recent bookings</p>
           <ul className="space-y-1.5">
             {extra.bookings.slice(0, 6).map((b) => (
-              <li key={b._id} className="flex items-center justify-between text-sm">
-                <span className="font-mono text-xs text-slate-500">#{b.bookingNumber}</span>
+              <li
+                key={b._id}
+                onClick={() => onBooking?.(b)}
+                className="flex items-center justify-between text-sm rounded px-2 py-1.5 -mx-2 cursor-pointer hover:bg-ink-800/60"
+              >
+                <span className="font-mono text-xs text-brand-400">#{b.bookingNumber}</span>
                 <span className="text-slate-400">{date(b.startDate)}</span>
                 <Badge value={b.status} />
               </li>
@@ -245,6 +294,8 @@ function FamilyDetail({ family, extra }) {
           </ul>
         </div>
       )}
+
+      <Notes targetType="family" target={family._id} initial={extra?.notes || []} />
     </div>
   );
 }

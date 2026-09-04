@@ -241,7 +241,7 @@ export default function Payments() {
         </div>
       )}
 
-      <Table
+      <Table startIndex={(page - 1) * 25}
         columns={isPayout ? payoutColumns : paymentColumns}
         rows={data.items || []}
         loading={loading}

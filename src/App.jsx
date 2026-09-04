@@ -11,6 +11,9 @@ import Payments from './pages/Payments.jsx';
 import Support from './pages/Support.jsx';
 import Chats from './pages/Chats.jsx';
 import Settings from './pages/Settings.jsx';
+import Pricing from './pages/Pricing.jsx';
+import Activity from './pages/Activity.jsx';
+import ReferralEngine from './pages/ReferralEngine.jsx';
 import Calendar from './pages/Calendar.jsx';
 import Referrals from './pages/Referrals.jsx';
 import Callbacks from './pages/Callbacks.jsx';
@@ -57,8 +60,11 @@ export default function App() {
           <Route path="families" element={<Families />} />
           <Route path="calendar" element={<Calendar />} />
           <Route path="payments" element={<Payments />} />
+          <Route path="pricing" element={<Pricing />} />
+          <Route path="activity" element={<Activity />} />
           <Route path="support" element={<Support />} />
           <Route path="referrals" element={<Referrals />} />
+          <Route path="referral-engine" element={<ReferralEngine />} />
           <Route path="conversations" element={<Conversations />} />
           <Route path="chats" element={<Chats />} />
           <Route path="settings" element={<Settings admin={admin} />} />

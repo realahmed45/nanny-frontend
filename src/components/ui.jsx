@@ -104,11 +104,24 @@ export const humanize = (s) =>
  * through each of them would be noise, and hardcoding USD showed the wrong
  * symbol everywhere the moment the platform switched to rupiah.
  */
-let activeCurrency = 'USD';
+// The platform runs in rupiah, so that is the default rather than USD.
+// /settings can still override it, but the wrong symbol must never flash on
+// screen while that request is in flight.
+let activeCurrency = 'IDR';
 export const setCurrency = (c) => { if (c) activeCurrency = c; };
+
+/** Symbols people actually recognise, where Intl's default is not it. */
+const SYMBOLS = { IDR: 'Rp' };
 
 export const money = (n, currency = activeCurrency) => {
   const value = Number(n || 0);
+  const symbol = SYMBOLS[currency];
+
+  // Intl renders IDR as "IDR 147,000"; in Indonesia it is written "Rp 147.000".
+  if (symbol) {
+    return `${symbol} ${Math.round(value).toLocaleString('en-US')}`;
+  }
+
   try {
     return new Intl.NumberFormat('en-US', {
       style: 'currency', currency, maximumFractionDigits: 0,
@@ -238,6 +251,9 @@ function SelectBox({ checked, partial, onChange, label }) {
 export function Table({
   columns, rows, empty = 'No records found.', onRowClick, loading, dense,
   selectable = false, selected = [], onSelectionChange,
+  // Row numbers are on by default; `startIndex` keeps them counting across
+  // pages, so row 1 of page 2 reads as 26 rather than starting over.
+  numbered = true, startIndex = 0,
 }) {
   if (loading) return <Skeleton rows={5} />;
   if (!rows?.length) {
@@ -278,6 +294,9 @@ export function Table({
                   />
                 </th>
               )}
+              {numbered && (
+                <th className={`th w-10 text-right ${dense ? 'px-2.5' : ''}`}>#</th>
+              )}
               {columns.map((c) => (
                 <th key={c.key} className={`th whitespace-nowrap ${dense ? 'px-2.5' : ''}`}>{c.header}</th>
               ))}
@@ -302,6 +321,11 @@ export function Table({
                         onChange={(next) => toggleRow(id, next)}
                         label="Select row"
                       />
+                    </td>
+                  )}
+                  {numbered && (
+                    <td className={`td w-10 text-right font-mono text-xs text-slate-500 ${dense ? 'px-2.5 py-3' : ''}`}>
+                      {startIndex + i + 1}
                     </td>
                   )}
                   {columns.map((c) => (

@@ -111,7 +111,7 @@ export default function Conversations() {
         </div>
       </div>
 
-      <Table
+      <Table startIndex={(page - 1) * 25}
         columns={columns}
         rows={data.items || []}
         loading={loading}

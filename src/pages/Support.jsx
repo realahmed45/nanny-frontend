@@ -147,7 +147,7 @@ export default function Support() {
 
       <FilterPills options={FILTERS} active={filter} onChange={(v) => { setFilter(v); setPage(1); }} />
 
-      <Table columns={columns} rows={items} loading={loading} onRowClick={open} dense empty="No tickets yet." />
+      <Table startIndex={(page - 1) * 25} columns={columns} rows={items} loading={loading} onRowClick={open} dense empty="No tickets yet." />
       <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />
 
       <Modal

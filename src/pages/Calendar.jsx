@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../lib/api.js';
-import { PageHeader, FilterPills, Skeleton, ErrorBox } from '../components/ui.jsx';
+import { PageHeader, FilterPills, Skeleton, ErrorBox, Tabs } from '../components/ui.jsx';
+import GeneralCalendar from './GeneralCalendar.jsx';
 
 const VIEW_FILTERS = [
   { value: 'all', label: 'All Bookings' },
@@ -31,7 +32,13 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const pad = (n) => String(n).padStart(2, '0');
 const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 
+const TOP_TABS = [
+  { value: 'bookings', label: 'Bookings' },
+  { value: 'general', label: 'General Calendar' },
+];
+
 export default function Calendar() {
+  const [tab, setTab] = useState('bookings');
   const [cursor, setCursor] = useState(() => new Date());
   const [view, setView] = useState('all');
   const [events, setEvents] = useState([]);
@@ -41,13 +48,14 @@ export default function Calendar() {
   const month = monthKey(cursor);
 
   useEffect(() => {
+    if (tab !== 'bookings') return;
     setLoading(true);
     setError(null);
     api(`/calendar?month=${month}`)
       .then((r) => setEvents(r.events || []))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [month]);
+  }, [month, tab]);
 
   // Build the 6x7 grid: leading blanks, the month's days, trailing blanks.
   const cells = useMemo(() => {
@@ -77,15 +85,25 @@ export default function Calendar() {
   const today = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
   const shift = (delta) => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + delta, 1));
 
-  if (error) return <ErrorBox error={error} />;
-
   return (
     <>
       <PageHeader
         title="Platform Calendar"
-        subtitle={`${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()} — all bookings, blocks, and availability`}
+        subtitle={
+          tab === 'bookings'
+            ? `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()} — all bookings, blocks, and availability`
+            : 'Special days, surcharges, and days we cannot staff'
+        }
       />
 
+      <Tabs tabs={TOP_TABS} active={tab} onChange={setTab} />
+
+      {tab === 'general' && <GeneralCalendar />}
+
+      {tab === 'bookings' && error && <ErrorBox error={error} />}
+
+      {tab === 'bookings' && !error && (
+      <>
       <FilterPills options={VIEW_FILTERS} active={view} onChange={setView} />
 
       <div className="card p-5">
@@ -171,6 +189,8 @@ export default function Calendar() {
           ))}
         </div>
       </div>
+      </>
+      )}
     </>
   );
 }
