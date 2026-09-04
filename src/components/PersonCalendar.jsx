@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../lib/api.js';
 import { Skeleton, ErrorBox, money } from './ui.jsx';
+import WeekCalendar, { startOfWeek } from './WeekCalendar.jsx';
 
 /**
  * One person's month.
@@ -44,6 +45,9 @@ const STATUS_TONE = {
 const toneFor = (e) => DAY_TONE[e.dayStatus] || STATUS_TONE[e.status] || STATUS_TONE.upcoming;
 
 export default function PersonCalendar({ role, personId, onBooking }) {
+  // Week first: a busy day has more bookings than a month cell can show, and
+  // hiding the rest behind a count is what made them unreachable.
+  const [span, setSpan] = useState('week');
   const [cursor, setCursor] = useState(() => new Date());
   const [events, setEvents] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -52,17 +56,42 @@ export default function PersonCalendar({ role, personId, onBooking }) {
   const [openDate, setOpenDate] = useState(null);
 
   const month = monthKey(cursor);
+  const weekStart = useMemo(() => startOfWeek(cursor), [cursor]);
+
+  // A week can straddle two months; both are fetched so a Monday at the end
+  // of a month is not silently empty.
+  const months = useMemo(() => {
+    if (span === 'month') return [month];
+    const end = new Date(weekStart);
+    end.setDate(end.getDate() + 6);
+    return [...new Set([monthKey(weekStart), monthKey(end)])];
+  }, [span, month, weekStart]);
 
   useEffect(() => {
     if (!personId) return;
     setLoading(true);
     setError(null);
-    const qs = new URLSearchParams({ month, [role]: personId });
-    api(`/calendar?${qs}`)
-      .then((r) => { setEvents(r.events || []); setSummary(r.summary || null); })
+    Promise.all(months.map((m) => {
+      const qs = new URLSearchParams({ month: m, [role]: personId });
+      return api(`/calendar?${qs}`);
+    }))
+      .then((rs) => {
+        setEvents(rs.flatMap((r) => r.events || []));
+        // Totals are summed across whatever was fetched, so the figures
+        // always describe the period on screen.
+        setSummary(rs.reduce((acc, r) => {
+          const s = r.summary || {};
+          return {
+            days: (acc.days || 0) + (s.days || 0),
+            hours: (acc.hours || 0) + (s.hours || 0),
+            bookings: (acc.bookings || 0) + (s.bookings || 0),
+            value: (acc.value || 0) + (s.value || 0),
+          };
+        }, {}));
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [month, personId, role]);
+  }, [months.join(','), personId, role]);
 
   // The grid, Monday-first — the week the booking days are described in.
   const cells = useMemo(() => {
@@ -89,9 +118,25 @@ export default function PersonCalendar({ role, personId, onBooking }) {
   }, [events]);
 
   const today = isoOf(new Date());
+
   const shift = (delta) => {
     setOpenDate(null);
+    if (span === 'week') {
+      const next = new Date(cursor);
+      next.setDate(next.getDate() + delta * 7);
+      setCursor(next);
+      return;
+    }
     setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + delta, 1));
+  };
+
+  const rangeLabel = () => {
+    if (span === 'month') return `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`;
+    const end = new Date(weekStart);
+    end.setDate(end.getDate() + 6);
+    return weekStart.getMonth() === end.getMonth()
+      ? `${weekStart.getDate()} – ${end.getDate()} ${MONTHS[end.getMonth()]}`
+      : `${weekStart.getDate()} ${MONTHS[weekStart.getMonth()].slice(0, 3)} – ${end.getDate()} ${MONTHS[end.getMonth()].slice(0, 3)}`;
   };
 
   if (error) return <ErrorBox error={error} />;
@@ -101,10 +146,21 @@ export default function PersonCalendar({ role, personId, onBooking }) {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h4 className="text-sm font-semibold text-white">
-          {MONTHS[cursor.getMonth()]} {cursor.getFullYear()}
-        </h4>
-        <div className="flex gap-2">
+        <h4 className="text-sm font-semibold text-white">{rangeLabel()}</h4>
+        <div className="flex flex-wrap gap-2">
+          <div className="flex rounded-lg border border-ink-800 overflow-hidden">
+            {['week', 'month'].map((s) => (
+              <button
+                key={s}
+                onClick={() => { setSpan(s); setOpenDate(null); }}
+                className={`px-2.5 py-1 text-xs capitalize transition-colors ${
+                  span === s ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
           <button className="btn-ghost text-xs" onClick={() => shift(-1)}>← Prev</button>
           <button
             className="btn-ghost text-xs"
@@ -140,7 +196,15 @@ export default function PersonCalendar({ role, personId, onBooking }) {
         </div>
       )}
 
-      {loading ? <Skeleton rows={5} /> : (
+      {loading ? <Skeleton rows={5} /> : span === 'week' ? (
+        <WeekCalendar
+          weekStart={weekStart}
+          events={events}
+          onBooking={onBooking}
+          showNanny={role !== 'nanny'}
+          showFamily={role !== 'family'}
+        />
+      ) : (
         <div className="overflow-x-auto">
           <div className="min-w-[560px]">
             <div className="grid grid-cols-7 mb-1">
@@ -185,7 +249,7 @@ export default function PersonCalendar({ role, personId, onBooking }) {
                             </div>
                           ))}
                           {dayEvents.length > 2 && (
-                            <p className="text-[10px] text-slate-500 px-1">
+                            <p className="text-[10px] text-brand-400 px-1">
                               +{dayEvents.length - 2} more
                             </p>
                           )}
@@ -247,7 +311,7 @@ export default function PersonCalendar({ role, personId, onBooking }) {
         </div>
       )}
 
-      {!loading && events.length === 0 && (
+      {!loading && events.length === 0 && span === 'month' && (
         <p className="text-xs text-slate-600 text-center py-6">
           Nothing booked in {MONTHS[cursor.getMonth()]}.
         </p>

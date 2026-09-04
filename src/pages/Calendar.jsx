@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api.js';
 import { PageHeader, FilterPills, Skeleton, ErrorBox, Tabs } from '../components/ui.jsx';
 import GeneralCalendar from './GeneralCalendar.jsx';
+import WeekCalendar, { startOfWeek } from '../components/WeekCalendar.jsx';
 
 const VIEW_FILTERS = [
   { value: 'all', label: 'All Bookings' },
@@ -38,24 +40,39 @@ const TOP_TABS = [
 ];
 
 export default function Calendar() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState('bookings');
+  // Week is the default: a month cell can only ever show a few of a busy
+  // day's bookings, and the rest were unreachable.
+  const [span, setSpan] = useState('week');
   const [cursor, setCursor] = useState(() => new Date());
+  const [openDate, setOpenDate] = useState(null);
   const [view, setView] = useState('all');
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const month = monthKey(cursor);
+  const weekStart = useMemo(() => startOfWeek(cursor), [cursor]);
+
+  // A week can straddle two months, so both are fetched and merged rather
+  // than showing an empty Monday every time one does.
+  const months = useMemo(() => {
+    if (span === 'month') return [month];
+    const end = new Date(weekStart);
+    end.setDate(end.getDate() + 6);
+    return [...new Set([monthKey(weekStart), monthKey(end)])];
+  }, [span, month, weekStart]);
 
   useEffect(() => {
     if (tab !== 'bookings') return;
     setLoading(true);
     setError(null);
-    api(`/calendar?month=${month}`)
-      .then((r) => setEvents(r.events || []))
+    Promise.all(months.map((m) => api(`/calendar?month=${m}`)))
+      .then((rs) => setEvents(rs.flatMap((r) => r.events || [])))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [month, tab]);
+  }, [months.join(','), tab]);
 
   // Build the 6x7 grid: leading blanks, the month's days, trailing blanks.
   const cells = useMemo(() => {
@@ -83,7 +100,32 @@ export default function Calendar() {
   }, [events, view]);
 
   const today = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
-  const shift = (delta) => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + delta, 1));
+
+  const shift = (delta) => {
+    setOpenDate(null);
+    if (span === 'week') {
+      const next = new Date(cursor);
+      next.setDate(next.getDate() + delta * 7);
+      setCursor(next);
+      return;
+    }
+    setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + delta, 1));
+  };
+
+  /** "12 – 18 May 2026", or the month, depending on what is showing. */
+  const rangeLabel = () => {
+    if (span === 'month') return `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`;
+    const end = new Date(weekStart);
+    end.setDate(end.getDate() + 6);
+    const sameMonth = weekStart.getMonth() === end.getMonth();
+    return sameMonth
+      ? `${weekStart.getDate()} – ${end.getDate()} ${MONTHS[end.getMonth()]} ${end.getFullYear()}`
+      : `${weekStart.getDate()} ${MONTHS[weekStart.getMonth()].slice(0, 3)} – ${end.getDate()} ${MONTHS[end.getMonth()].slice(0, 3)} ${end.getFullYear()}`;
+  };
+
+  const openBooking = (e) => {
+    if (e.bookingNumber) navigate(`/bookings?search=${e.bookingNumber}`);
+  };
 
   return (
     <>
@@ -91,7 +133,7 @@ export default function Calendar() {
         title="Platform Calendar"
         subtitle={
           tab === 'bookings'
-            ? `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()} — all bookings, blocks, and availability`
+            ? `${rangeLabel()} — every booking, with the family and the nanny on each`
             : 'Special days, surcharges, and days we cannot staff'
         }
       />
@@ -107,22 +149,42 @@ export default function Calendar() {
       <FilterPills options={VIEW_FILTERS} active={view} onChange={setView} />
 
       <div className="card p-5">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-semibold text-white">
-            {MONTHS[cursor.getMonth()]} {cursor.getFullYear()}
-          </h3>
-          <div className="flex gap-2">
-            <button className="btn-ghost text-xs" onClick={() => shift(-1)}>
-              ← {MONTHS[(cursor.getMonth() + 11) % 12].slice(0, 3)}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <h3 className="text-lg font-semibold text-white">{rangeLabel()}</h3>
+
+          <div className="flex flex-wrap gap-2">
+            <div className="flex rounded-lg border border-ink-800 overflow-hidden">
+              {['week', 'month'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { setSpan(s); setOpenDate(null); }}
+                  className={`px-3 py-1.5 text-xs capitalize transition-colors ${
+                    span === s ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <button className="btn-ghost text-xs" onClick={() => shift(-1)}>← Prev</button>
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => { setCursor(new Date()); setOpenDate(null); }}
+            >
+              Today
             </button>
-            <button className="btn-ghost text-xs" onClick={() => setCursor(new Date())}>Today</button>
-            <button className="btn-ghost text-xs" onClick={() => shift(1)}>
-              {MONTHS[(cursor.getMonth() + 1) % 12].slice(0, 3)} →
-            </button>
+            <button className="btn-ghost text-xs" onClick={() => shift(1)}>Next →</button>
           </div>
         </div>
 
-        {loading ? <Skeleton rows={6} /> : (
+        {loading ? <Skeleton rows={6} /> : span === 'week' ? (
+          <WeekCalendar
+            weekStart={weekStart}
+            events={Object.values(byDate).flat()}
+            onBooking={openBooking}
+          />
+        ) : (
           <div className="overflow-x-auto">
             <div className="min-w-[720px]">
               <div className="grid grid-cols-7 mb-1">
@@ -137,8 +199,11 @@ export default function Calendar() {
                   return (
                     <div
                       key={i}
+                      onClick={dayEvents.length ? () => setOpenDate(iso === openDate ? null : iso) : undefined}
                       className={`min-h-[96px] border-r border-b border-ink-800 p-1.5 ${
                         iso ? '' : 'bg-ink-950/60'
+                      } ${dayEvents.length ? 'cursor-pointer hover:bg-ink-800/40' : ''} ${
+                        iso === openDate ? 'bg-ink-800/60' : ''
                       }`}
                     >
                       {iso && (
@@ -165,8 +230,8 @@ export default function Calendar() {
                               </div>
                             ))}
                             {dayEvents.length > 3 && (
-                              <p className="text-[10px] text-slate-500 px-1">
-                                +{dayEvents.length - 3} more
+                              <p className="text-[10px] text-brand-400 px-1 hover:text-brand-300">
+                                +{dayEvents.length - 3} more — click to see all
                               </p>
                             )}
                           </div>
@@ -176,6 +241,49 @@ export default function Calendar() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+        )}
+
+        {span === 'month' && openDate && (byDate[openDate] || []).length > 0 && (
+          <div className="mt-4 rounded-lg border border-ink-800 bg-ink-950/60 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h5 className="text-xs font-mono uppercase tracking-wider text-slate-500">
+                {new Date(`${openDate}T00:00:00`).toLocaleDateString(undefined, {
+                  weekday: 'long', day: 'numeric', month: 'long',
+                })}
+                <span className="ml-2 text-slate-600">
+                  {(byDate[openDate] || []).length} booking(s)
+                </span>
+              </h5>
+              <button
+                className="text-xs text-slate-500 hover:text-slate-300"
+                onClick={() => setOpenDate(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              {(byDate[openDate] || []).map((e, i) => (
+                <div
+                  key={i}
+                  onClick={() => openBooking(e)}
+                  className={`flex flex-wrap items-center gap-3 rounded px-2.5 py-2 border ${
+                    EVENT_STYLES[e.status] || EVENT_STYLES.cancelled
+                  } ${e.bookingNumber ? 'cursor-pointer' : ''}`}
+                >
+                  <span className="font-mono text-xs w-14">{e.time || '—'}</span>
+                  <span className="text-xs flex-1 min-w-[120px]">{e.family || e.label}</span>
+                  <span className="text-xs opacity-80 w-28 truncate">
+                    {e.nanny || 'Needs a nanny'}
+                  </span>
+                  {e.bookingNumber && (
+                    <span className="font-mono text-[11px] opacity-70">#{e.bookingNumber}</span>
+                  )}
+                  {e.hours ? <span className="text-[11px] opacity-70">{e.hours}h</span> : null}
+                </div>
+              ))}
             </div>
           </div>
         )}
