@@ -115,21 +115,13 @@ const SYMBOLS = { IDR: 'Rp' };
 
 export const money = (n, currency = activeCurrency) => {
   const value = Number(n || 0);
-  const symbol = SYMBOLS[currency];
 
-  // Intl renders IDR as "IDR 147,000"; in Indonesia it is written "Rp 147.000".
-  if (symbol) {
-    return `${symbol} ${Math.round(value).toLocaleString('en-US')}`;
-  }
-
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency', currency, maximumFractionDigits: 0,
-    }).format(value);
-  } catch {
-    // An unknown code would otherwise throw and blank the cell.
-    return `${currency} ${value.toLocaleString('en-US')}`;
-  }
+  // Intl renders IDR as "IDR 147,000"; in Indonesia it is written "Rp 147,000".
+  // Anything else falls back to its own code rather than going through Intl,
+  // which would render a currency symbol — and a dollar sign on a rupiah
+  // platform is how a price gets misread by a factor of fifteen thousand.
+  const symbol = SYMBOLS[currency] || currency;
+  return `${symbol} ${Math.round(value).toLocaleString('en-US')}`;
 };
 
 export const date = (d) =>
