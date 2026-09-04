@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api.js';
 import Notes from '../components/Notes.jsx';
+import PersonCalendar from '../components/PersonCalendar.jsx';
 import {
-  PageHeader, Table, Badge, Modal, Field, Avatar, Pagination,
-  useToast, ErrorBox, money, date, humanize,
+  PageHeader, Table, Badge, Modal, Field, Avatar, Pagination, useToast, ErrorBox, money, date, humanize, Tabs,
 } from '../components/ui.jsx';
 import { IconSearch, IconEye, IconCheck, IconX, IconStar } from '../components/icons.jsx';
 
@@ -53,10 +53,12 @@ export default function Nannies() {
   }, [search, status, page]);
 
   const navigate = useNavigate();
+  const [detailTab, setDetailTab] = useState('profile');
 
   const open = (n) => {
     setSelected(n);
     setDetail(null);
+    setDetailTab('profile');
     api(`/nannies/${n._id}`).then(setDetail).catch(() => setDetail({ nanny: n }));
   };
 
@@ -245,12 +247,31 @@ export default function Nannies() {
         }
       >
         {selected && (
-          <NannyDetail
-            nanny={detail?.nanny || selected}
-            extra={detail}
-            onVideo={onVideo}
-            onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
-          />
+          <>
+            <Tabs
+              tabs={[
+                { value: 'profile', label: 'Profile' },
+                { value: 'calendar', label: 'Calendar' },
+              ]}
+              active={detailTab}
+              onChange={setDetailTab}
+            />
+
+            {detailTab === 'profile' ? (
+              <NannyDetail
+                nanny={detail?.nanny || selected}
+                extra={detail}
+                onVideo={onVideo}
+                onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
+              />
+            ) : (
+              <PersonCalendar
+                role="nanny"
+                personId={selected._id}
+                onBooking={(e) => navigate(`/bookings?search=${e.bookingNumber}`)}
+              />
+            )}
+          </>
         )}
       </Modal>
 

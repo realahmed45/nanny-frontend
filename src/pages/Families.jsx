@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api.js';
 import Notes from '../components/Notes.jsx';
+import PersonCalendar from '../components/PersonCalendar.jsx';
 import {
-  PageHeader, Table, Badge, Modal, Field, Avatar, Pagination,
-  useToast, ErrorBox, money, date,
+  PageHeader, Table, Badge, Modal, Field, Avatar, Pagination, useToast, ErrorBox, money, date, Tabs,
 } from '../components/ui.jsx';
 import { IconSearch, IconEye } from '../components/icons.jsx';
 
@@ -41,8 +41,10 @@ export default function Families() {
   }, [search, page]);
 
   const navigate = useNavigate();
+  const [detailTab, setDetailTab] = useState('profile');
 
   const open = (f) => {
+    setDetailTab('profile');
     setSelected(f);
     setDetail(null);
     api(`/families/${f._id}`).then(setDetail).catch(() => setDetail({ family: f }));
@@ -177,11 +179,30 @@ export default function Families() {
         }
       >
         {selected && (
-          <FamilyDetail
-            family={detail?.family || selected}
-            extra={detail}
-            onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
-          />
+          <>
+            <Tabs
+              tabs={[
+                { value: 'profile', label: 'Profile' },
+                { value: 'calendar', label: 'Calendar' },
+              ]}
+              active={detailTab}
+              onChange={setDetailTab}
+            />
+
+            {detailTab === 'profile' ? (
+              <FamilyDetail
+                family={detail?.family || selected}
+                extra={detail}
+                onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
+              />
+            ) : (
+              <PersonCalendar
+                role="family"
+                personId={selected._id}
+                onBooking={(e) => navigate(`/bookings?search=${e.bookingNumber}`)}
+              />
+            )}
+          </>
         )}
       </Modal>
 
