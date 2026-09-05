@@ -6,7 +6,7 @@ import PersonCalendar from '../components/PersonCalendar.jsx';
 import ReferralsTab from '../components/ReferralsTab.jsx';
 import {
   PageHeader, Table, Badge, Modal, Field, Avatar, Pagination, useToast, ErrorBox, money, date, Tabs,
-  lastActive,
+  LastActive,
 } from '../components/ui.jsx';
 import { IconSearch, IconEye } from '../components/icons.jsx';
 
@@ -269,9 +269,7 @@ function FamilyDetail({ family, extra, onBooking }) {
           <p className="font-semibold text-white">{family.fullName}</p>
           <p className="text-xs font-mono text-slate-500">{family.phone} · {family.email || 'no email'}</p>
           {/* Last seen, so an idle account is obvious without digging. */}
-          <p className={`text-[11px] ${lastActive(family.lastSeenAt).stale ? 'text-slate-600' : 'text-slate-400'}`}>
-            Last active: {lastActive(family.lastSeenAt).text}
-          </p>
+          <div className="mt-1"><LastActive at={family.lastSeenAt} /></div>
         </div>
         <span className="ml-auto"><Badge value={family.blocked ? 'suspended' : 'active'} /></span>
       </div>

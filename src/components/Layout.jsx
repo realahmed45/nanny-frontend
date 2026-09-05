@@ -22,6 +22,7 @@ const NAV = [
   { to: '/referral-engine', label: 'Referral Engine', Icon: IconReferrals },
   { to: '/conversations', label: 'Conversations', Icon: IconChats },
   { to: '/activity', label: 'Activity Log', Icon: IconSupport },
+  { to: '/notes', label: 'Notes', Icon: IconSupport },
   { to: '/settings', label: 'Settings', Icon: IconSettings },
 ];
 

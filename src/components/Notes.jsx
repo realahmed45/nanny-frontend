@@ -81,6 +81,16 @@ function NoteTag({ note, targetType, onNavigate }) {
   );
 }
 
+/**
+ * A note stays editable for three hours, matching the server.
+ *
+ * Fixing a typo or a wrong booking soon after writing is honest; rewriting one
+ * a day later, after people have acted on it, is not. Checked here too so the
+ * button disappears instead of failing when pressed.
+ */
+const NOTE_EDIT_WINDOW_MS = 3 * 60 * 60 * 1000;
+const editable = (n) => Date.now() - new Date(n.createdAt).getTime() <= NOTE_EDIT_WINDOW_MS;
+
 /** Label a booking the way an admin would recognise it in a dropdown. */
 function bookingLabel(b) {
   const num = b.bookingNumber || String(b._id).slice(-6);
@@ -295,16 +305,25 @@ export default function Notes({ targetType, target, initial = [], bookings = [],
                     where its bookings are available to re-file against. */}
                 {(targetType !== 'booking' || n.targetType === 'booking') && (
                   <div className="flex gap-2 shrink-0">
-                    <button
-                      className="text-xs text-slate-500 hover:text-slate-300"
-                      onClick={() => {
-                        setEditing(n._id);
-                        setEditBody(n.body);
-                        setEditRef(n.bookingRef || '');
-                      }}
-                    >
-                      Edit
-                    </button>
+                    {editable(n) ? (
+                      <button
+                        className="text-xs text-slate-500 hover:text-slate-300"
+                        onClick={() => {
+                          setEditing(n._id);
+                          setEditBody(n.body);
+                          setEditRef(n.bookingRef || '');
+                        }}
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <span
+                        className="text-xs text-slate-700"
+                        title="A note can only be edited within 3 hours of being written"
+                      >
+                        Locked
+                      </span>
+                    )}
                     <button
                       className="text-xs text-slate-500 hover:text-red-400"
                       onClick={() => remove(n._id)}

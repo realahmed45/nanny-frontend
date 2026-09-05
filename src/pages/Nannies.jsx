@@ -4,9 +4,10 @@ import api from '../lib/api.js';
 import Notes from '../components/Notes.jsx';
 import PersonCalendar from '../components/PersonCalendar.jsx';
 import ReferralsTab from '../components/ReferralsTab.jsx';
+import MediaTab from '../components/MediaTab.jsx';
 import {
   PageHeader, Table, Badge, Modal, Field, Avatar, Pagination, useToast, ErrorBox, money, date, humanize, Tabs,
-  lastActive,
+  LastActive,
 } from '../components/ui.jsx';
 import { IconSearch, IconEye, IconCheck, IconX, IconStar } from '../components/icons.jsx';
 
@@ -95,25 +96,6 @@ export default function Nannies() {
       return;
     }
     open({ _id: person._id, fullName: person.fullName });
-  };
-
-  /** Approve, hide or delete one of her videos, then refresh the modal. */
-  const onVideo = async (video, { approved, remove }) => {
-    try {
-      if (remove) {
-        await api(`/nannies/${selected._id}/videos/${video._id}`, { method: 'DELETE' });
-        notify('Video deleted.');
-      } else {
-        await api(`/nannies/${selected._id}/videos/${video._id}`, {
-          method: 'PATCH', body: { approved },
-        });
-        notify(approved ? 'Video is now visible to families.' : 'Video hidden from families.');
-      }
-      const fresh = await api(`/nannies/${selected._id}`);
-      setDetail(fresh);
-    } catch (e) {
-      toastError(e.message);
-    }
   };
 
   const act = async (path, label) => {
@@ -287,6 +269,7 @@ export default function Nannies() {
               tabs={[
                 { value: 'profile', label: 'Profile' },
                 { value: 'calendar', label: 'Calendar' },
+                { value: 'media', label: 'Nanny videos' },
                 { value: 'referrals', label: 'Referrals' },
               ]}
               active={detailTab}
@@ -297,7 +280,6 @@ export default function Nannies() {
               <NannyDetail
                 nanny={detail?.nanny || selected}
                 extra={detail}
-                onVideo={onVideo}
                 onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
               />
             )}
@@ -307,6 +289,13 @@ export default function Nannies() {
                 role="nanny"
                 personId={selected._id}
                 onBooking={(e) => navigate(`/bookings?search=${e.bookingNumber}`)}
+              />
+            )}
+
+            {detailTab === 'media' && (
+              <MediaTab
+                nanny={detail?.nanny || selected}
+                onChanged={async () => setDetail(await api(`/nannies/${selected._id}`))}
               />
             )}
 
@@ -325,7 +314,7 @@ export default function Nannies() {
   );
 }
 
-function NannyDetail({ nanny, extra, onBooking, onVideo }) {
+function NannyDetail({ nanny, extra, onBooking }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -334,9 +323,7 @@ function NannyDetail({ nanny, extra, onBooking, onVideo }) {
           <p className="font-semibold text-white">{nanny.fullName}</p>
           <p className="text-xs font-mono text-slate-500">{nanny.phone} · {nanny.email || 'no email'}</p>
           {/* Last seen, so an idle nanny is obvious before she is offered work. */}
-          <p className={`text-[11px] ${lastActive(nanny.lastSeenAt).stale ? 'text-slate-600' : 'text-slate-400'}`}>
-            Last active: {lastActive(nanny.lastSeenAt).text}
-          </p>
+          <div className="mt-1"><LastActive at={nanny.lastSeenAt} /></div>
         </div>
         <span className="ml-auto"><Badge value={nanny.nannyStatus} /></span>
       </div>
@@ -375,45 +362,15 @@ function NannyDetail({ nanny, extra, onBooking, onVideo }) {
       )}
 
       {/* Her introduction video. Families only see it once it is approved. */}
-      {nanny.videos?.length > 0 && (
-        <div>
-          <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
-            Presentation videos
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {nanny.videos.map((v) => (
-              <div key={v._id || v.url} className="rounded-lg border border-ink-800 bg-ink-950/60 p-2">
-                <video
-                  src={v.url}
-                  poster={v.thumbnailUrl}
-                  controls
-                  preload="metadata"
-                  className="w-full rounded bg-black max-h-52"
-                />
-                <div className="flex items-center justify-between mt-2 px-1">
-                  <span className="text-xs text-slate-400">{v.title || 'Introduction'}</span>
-                  {v.approved
-                    ? <span className="text-xs text-emerald-400">Live to families</span>
-                    : <span className="text-xs text-amber-400">Awaiting review</span>}
-                </div>
-                <div className="flex gap-2 mt-2 px-1">
-                  <button
-                    className="btn-ghost text-xs"
-                    onClick={() => onVideo?.(v, { approved: !v.approved })}
-                  >
-                    {v.approved ? 'Hide from families' : 'Approve'}
-                  </button>
-                  <button
-                    className="btn-ghost text-xs text-red-400"
-                    onClick={() => onVideo?.(v, { remove: true })}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Her videos and photos live in the Nanny videos tab, where a backlog
+          can be reviewed without scrolling past the rest of her record. */}
+      {(nanny.videos?.length > 0 || nanny.photos?.length > 0) && (
+        <p className="text-xs text-slate-500">
+          {nanny.videos?.length || 0} video{nanny.videos?.length === 1 ? '' : 's'}
+          {' and '}
+          {nanny.photos?.length || 0} photo{nanny.photos?.length === 1 ? '' : 's'}
+          {' — see the '}<span className="text-slate-300">Nanny videos</span> tab.
+        </p>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">

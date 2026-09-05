@@ -166,6 +166,34 @@ export const lastActive = (d) => {
   return { text: `${days}d ago · ${when}`, stale: days > 30 };
 };
 
+/**
+ * Last seen, as a badge rather than a caption.
+ *
+ * Whether someone is reachable decides whether it is worth offering them work
+ * at all, so it is read at a glance beside the name — not in grey small print
+ * that the eye slides past. A live green dot, an amber one once they have been
+ * quiet a day, grey when they have gone cold.
+ */
+export function LastActive({ at }) {
+  const { text, stale } = lastActive(at);
+  const mins = at ? Math.floor((Date.now() - new Date(at)) / 60000) : Infinity;
+  const tone = stale ? 'text-slate-500 bg-ink-800'
+    : mins < 60 ? 'text-emerald-300 bg-emerald-500/15'
+      : mins < 1440 ? 'text-slate-300 bg-ink-800'
+        : 'text-amber-300 bg-amber-500/15';
+  const dot = stale ? 'bg-slate-600'
+    : mins < 60 ? 'bg-emerald-400'
+      : mins < 1440 ? 'bg-slate-400'
+        : 'bg-amber-400';
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ${tone}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      {text}
+    </span>
+  );
+}
+
 /** "2h", "3d" — the age column on tickets. */
 export const age = (d) => {
   if (!d) return '—';

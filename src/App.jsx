@@ -10,6 +10,7 @@ import Families from './pages/Families.jsx';
 import Payments from './pages/Payments.jsx';
 import Support from './pages/Support.jsx';
 import Chats from './pages/Chats.jsx';
+import NotesPage from './pages/Notes.jsx';
 import Settings from './pages/Settings.jsx';
 import Pricing from './pages/Pricing.jsx';
 import Activity from './pages/Activity.jsx';
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="referral-engine" element={<ReferralEngine />} />
           <Route path="conversations" element={<Conversations />} />
           <Route path="chats" element={<Chats />} />
+          <Route path="notes" element={<NotesPage />} />
           <Route path="settings" element={<Settings admin={admin} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
