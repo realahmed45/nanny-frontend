@@ -205,7 +205,7 @@ export default function Notes({ targetType, target, initial = [], bookings = [],
           the highlight means rather than leaving it to be guessed. */}
       {targetType === 'booking' && notes.some((n) => !n.relevant) && (
         <p className="text-xs text-slate-500 mb-3">
-          <span className="text-brand-400">Highlighted</span> notes are about this booking.
+          <span className="text-brand-400">Glowing</span> notes are about this booking.
           The rest are from the family's and nanny's profiles, shown for context.
         </p>
       )}
@@ -292,15 +292,22 @@ export default function Notes({ targetType, target, initial = [], bookings = [],
       {notes.length === 0 ? (
         <p className="text-xs text-slate-600 py-2">No notes yet.</p>
       ) : (
-        <div className="space-y-3">
+        <div
+          /* Roomier than a plain list so a glowing card has space to bleed
+             into instead of butting against its neighbour. */
+          className="space-y-4"
+        >
           {notes.map((n) => (
             <div
               key={n._id}
-              /* On a booking, the notes actually about it are marked; the rest
-                 are context from the people involved and stay muted. */
-              className={`rounded-lg border p-3 ${
+              /* On a booking, the notes actually about it glow; the rest are
+                 context from the people involved and stay muted. The ring sits
+                 outside the border so it reads as light around the card rather
+                 than a thicker edge — the difference has to survive a glance
+                 down a list where most cards are the muted kind. */
+              className={`rounded-lg border p-3 transition-shadow ${
                 targetType === 'booking' && n.relevant
-                  ? 'border-brand-500/50 bg-brand-500/5'
+                  ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/40 shadow-[0_0_20px_-2px_rgba(59,130,246,0.55)]'
                   : 'border-ink-800 bg-ink-950/40'
               }`}
             >
