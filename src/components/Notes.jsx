@@ -28,9 +28,76 @@ function guessKind(url) {
 
 const KIND_ICON = { image: '🖼️', pdf: '📄', document: '📎', other: '🔗' };
 
-export default function Notes({ targetType, target, initial = [] }) {
+/**
+ * What a note is filed under, shown beside it.
+ *
+ * A pin for a general note, a clickable booking number for one about a
+ * booking, so the note and the thing it concerns are one click apart. On a
+ * booking's own page a note written there needs no badge — the page is the
+ * context — but a note pulled in from a person's profile is labelled with
+ * whose it is, otherwise it reads as if it were written about this booking.
+ */
+function NoteTag({ note, targetType, onNavigate }) {
+  const own = note.targetType === 'booking';
+
+  if (targetType === 'booking') {
+    if (own) return null;
+    const who = note.targetType === 'family' ? 'Family' : 'Nanny';
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 mr-1.5 ${
+          note.relevant ? 'bg-brand-500/20 text-brand-400' : 'bg-ink-800 text-slate-400'
+        }`}
+        title={note.relevant
+          ? `Filed against this booking on the ${who.toLowerCase()}'s profile`
+          : `A general note from the ${who.toLowerCase()}'s profile`}
+      >
+        <span>{note.relevant ? '📅' : '📌'}</span>
+        <span>{who}</span>
+      </span>
+    );
+  }
+
+  if (!note.bookingRef) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 mr-1.5 bg-ink-800 text-slate-400"
+        title="A general note, not about a particular booking"
+      >
+        📌 General
+      </span>
+    );
+  }
+
+  const num = note.bookingNumber || String(note.bookingRef).slice(-6);
+  return (
+    <button
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 mr-1.5 bg-brand-500/20 text-brand-400 hover:bg-brand-500/30"
+      onClick={() => onNavigate?.(note.bookingRef)}
+      title={`About booking #${num} — open it`}
+    >
+      📅 #{num}
+    </button>
+  );
+}
+
+/** Label a booking the way an admin would recognise it in a dropdown. */
+function bookingLabel(b) {
+  const num = b.bookingNumber || String(b._id).slice(-6);
+  const when = b.startDate ? ` · ${String(b.startDate).slice(0, 10)}` : '';
+  return `#${num}${when}`;
+}
+
+/**
+ * @param bookings  The person's bookings, so a note can be filed against one.
+ *                  Not needed on a booking's own page: those notes are about
+ *                  that booking by definition.
+ * @param onNavigate  Called with a booking id when its badge is clicked.
+ */
+export default function Notes({ targetType, target, initial = [], bookings = [], onNavigate }) {
   const [notes, setNotes] = useState(initial);
   const [body, setBody] = useState('');
+  const [bookingRef, setBookingRef] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [attachUrl, setAttachUrl] = useState('');
   const [attachName, setAttachName] = useState('');
@@ -38,6 +105,7 @@ export default function Notes({ targetType, target, initial = [] }) {
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);
   const [editBody, setEditBody] = useState('');
+  const [editRef, setEditRef] = useState('');
 
   useEffect(() => { setNotes(initial); }, [target]);
 
@@ -65,9 +133,10 @@ export default function Notes({ targetType, target, initial = [] }) {
     try {
       await api(`/notes/${targetType}/${target}`, {
         method: 'POST',
-        body: { body: body.trim(), attachments },
+        body: { body: body.trim(), attachments, bookingRef: bookingRef || null },
       });
       setBody('');
+      setBookingRef('');
       setAttachments([]);
       await reload();
     } catch (e) {
@@ -80,7 +149,10 @@ export default function Notes({ targetType, target, initial = [] }) {
   const saveEdit = async (id) => {
     if (!editBody.trim()) return;
     try {
-      await api(`/notes/${id}`, { method: 'PATCH', body: { body: editBody.trim() } });
+      await api(`/notes/${id}`, {
+        method: 'PATCH',
+        body: { body: editBody.trim(), bookingRef: editRef || null },
+      });
       setEditing(null);
       await reload();
     } catch (e) {
@@ -103,6 +175,15 @@ export default function Notes({ targetType, target, initial = [] }) {
         Notes
         <span className="ml-2 text-xs font-normal text-slate-500">{notes.length}</span>
       </h4>
+
+      {/* The booking view borrows notes from the people involved, so say what
+          the highlight means rather than leaving it to be guessed. */}
+      {targetType === 'booking' && notes.some((n) => !n.relevant) && (
+        <p className="text-xs text-slate-500 mb-3">
+          <span className="text-brand-400">Highlighted</span> notes are about this booking.
+          The rest are from the family's and nanny's profiles, shown for context.
+        </p>
+      )}
 
       {/* ---------------- Composer ---------------- */}
       <div className="rounded-lg border border-ink-800 bg-ink-950/60 p-3 mb-4">
@@ -130,6 +211,24 @@ export default function Notes({ targetType, target, initial = [] }) {
                 </button>
               </span>
             ))}
+          </div>
+        )}
+
+        {/* A note is general, or about one booking. Asked at writing time,
+            because nobody comes back later to file it. */}
+        {targetType !== 'booking' && (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs text-slate-500 shrink-0">This note is about</span>
+            <select
+              className="input text-xs flex-1"
+              value={bookingRef}
+              onChange={(e) => setBookingRef(e.target.value)}
+            >
+              <option value="">📌 General — not a specific booking</option>
+              {bookings.map((b) => (
+                <option key={b._id} value={b._id}>📅 Booking {bookingLabel(b)}</option>
+              ))}
+            </select>
           </div>
         )}
 
@@ -170,9 +269,19 @@ export default function Notes({ targetType, target, initial = [] }) {
       ) : (
         <div className="space-y-3">
           {notes.map((n) => (
-            <div key={n._id} className="rounded-lg border border-ink-800 bg-ink-950/40 p-3">
+            <div
+              key={n._id}
+              /* On a booking, the notes actually about it are marked; the rest
+                 are context from the people involved and stay muted. */
+              className={`rounded-lg border p-3 ${
+                targetType === 'booking' && n.relevant
+                  ? 'border-brand-500/50 bg-brand-500/5'
+                  : 'border-ink-800 bg-ink-950/40'
+              }`}
+            >
               <div className="flex items-start justify-between gap-3 mb-1.5">
                 <div className="text-xs">
+                  <NoteTag note={n} targetType={targetType} onNavigate={onNavigate} />
                   <span className="text-slate-300 font-medium">{n.authorName || 'Unknown'}</span>
                   <span className="text-slate-600"> · {dateTime(n.createdAt)}</span>
                   {n.editedAt && (
@@ -181,20 +290,29 @@ export default function Notes({ targetType, target, initial = [] }) {
                     </span>
                   )}
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    className="text-xs text-slate-500 hover:text-slate-300"
-                    onClick={() => { setEditing(n._id); setEditBody(n.body); }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="text-xs text-slate-500 hover:text-red-400"
-                    onClick={() => remove(n._id)}
-                  >
-                    Delete
-                  </button>
-                </div>
+                {/* A note borrowed from someone's profile is shown here for
+                    context but belongs to that profile — it is edited there,
+                    where its bookings are available to re-file against. */}
+                {(targetType !== 'booking' || n.targetType === 'booking') && (
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      className="text-xs text-slate-500 hover:text-slate-300"
+                      onClick={() => {
+                        setEditing(n._id);
+                        setEditBody(n.body);
+                        setEditRef(n.bookingRef || '');
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="text-xs text-slate-500 hover:text-red-400"
+                      onClick={() => remove(n._id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
 
               {editing === n._id ? (
@@ -204,6 +322,20 @@ export default function Notes({ targetType, target, initial = [] }) {
                     value={editBody}
                     onChange={(e) => setEditBody(e.target.value)}
                   />
+                  {/* Re-file a note put under the wrong heading. Notes written
+                      on a booking are about it by definition, so they stay. */}
+                  {n.targetType !== 'booking' && bookings.length > 0 && (
+                    <select
+                      className="input text-xs mt-2"
+                      value={editRef}
+                      onChange={(e) => setEditRef(e.target.value)}
+                    >
+                      <option value="">📌 General — not a specific booking</option>
+                      {bookings.map((b) => (
+                        <option key={b._id} value={b._id}>📅 Booking {bookingLabel(b)}</option>
+                      ))}
+                    </select>
+                  )}
                   <div className="flex gap-2 mt-2">
                     <button className="btn-primary text-xs" onClick={() => saveEdit(n._id)}>Save</button>
                     <button className="btn-ghost text-xs" onClick={() => setEditing(null)}>Cancel</button>

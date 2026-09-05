@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api.js';
 import Notes from '../components/Notes.jsx';
 import PersonCalendar from '../components/PersonCalendar.jsx';
+import ReferralsTab from '../components/ReferralsTab.jsx';
 import {
   PageHeader, Table, Badge, Modal, Field, Avatar, Pagination, useToast, ErrorBox, money, date, humanize, Tabs,
+  lastActive,
 } from '../components/ui.jsx';
 import { IconSearch, IconEye, IconCheck, IconX, IconStar } from '../components/icons.jsx';
 
@@ -53,6 +55,7 @@ export default function Nannies() {
   }, [search, status, page]);
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [detailTab, setDetailTab] = useState('profile');
 
   const open = (n) => {
@@ -60,6 +63,38 @@ export default function Nannies() {
     setDetail(null);
     setDetailTab('profile');
     api(`/nannies/${n._id}`).then(setDetail).catch(() => setDetail({ nanny: n }));
+  };
+
+  /**
+   * A referral row on the other role's page links here with ?open=<id>.
+   * Without this the link would land on an unchanged list, which is worse
+   * than not linking at all.
+   */
+  useEffect(() => {
+    const id = searchParams.get('open');
+    if (!id) return;
+    api(`/nannies/${id}`)
+      .then((d) => {
+        const person = d?.nanny;
+        if (person) open(person);
+      })
+      .catch(() => {})
+      .finally(() => {
+        // Drop the param so a refresh or a close does not reopen it.
+        searchParams.delete('open');
+        setSearchParams(searchParams, { replace: true });
+      });
+    // Only ever acted on once, when the page is entered with the param.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** A referral can point either way; a family lives on its own page. */
+  const openReferral = (person) => {
+    if (person.role === 'family') {
+      navigate(`/families?open=${person._id}`);
+      return;
+    }
+    open({ _id: person._id, fullName: person.fullName });
   };
 
   /** Approve, hide or delete one of her videos, then refresh the modal. */
@@ -252,23 +287,33 @@ export default function Nannies() {
               tabs={[
                 { value: 'profile', label: 'Profile' },
                 { value: 'calendar', label: 'Calendar' },
+                { value: 'referrals', label: 'Referrals' },
               ]}
               active={detailTab}
               onChange={setDetailTab}
             />
 
-            {detailTab === 'profile' ? (
+            {detailTab === 'profile' && (
               <NannyDetail
                 nanny={detail?.nanny || selected}
                 extra={detail}
                 onVideo={onVideo}
                 onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
               />
-            ) : (
+            )}
+
+            {detailTab === 'calendar' && (
               <PersonCalendar
                 role="nanny"
                 personId={selected._id}
                 onBooking={(e) => navigate(`/bookings?search=${e.bookingNumber}`)}
+              />
+            )}
+
+            {detailTab === 'referrals' && (
+              <ReferralsTab
+                personId={selected._id}
+                onOpenPerson={openReferral}
               />
             )}
           </>
@@ -288,6 +333,10 @@ function NannyDetail({ nanny, extra, onBooking, onVideo }) {
         <div>
           <p className="font-semibold text-white">{nanny.fullName}</p>
           <p className="text-xs font-mono text-slate-500">{nanny.phone} · {nanny.email || 'no email'}</p>
+          {/* Last seen, so an idle nanny is obvious before she is offered work. */}
+          <p className={`text-[11px] ${lastActive(nanny.lastSeenAt).stale ? 'text-slate-600' : 'text-slate-400'}`}>
+            Last active: {lastActive(nanny.lastSeenAt).text}
+          </p>
         </div>
         <span className="ml-auto"><Badge value={nanny.nannyStatus} /></span>
       </div>
@@ -458,7 +507,16 @@ function NannyDetail({ nanny, extra, onBooking, onVideo }) {
         </div>
       )}
 
-      <Notes targetType="nanny" target={nanny._id} initial={extra?.notes || []} />
+      <Notes
+        targetType="nanny"
+        target={nanny._id}
+        initial={extra?.notes || []}
+        bookings={extra?.bookings || []}
+        onNavigate={(id) => {
+          const b = (extra?.bookings || []).find((x) => String(x._id) === String(id));
+          if (b) onBooking?.(b);
+        }}
+      />
     </div>
   );
 }

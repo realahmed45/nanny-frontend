@@ -150,6 +150,22 @@ export const dateTime = (d) =>
     day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
   }) : '—';
 
+/**
+ * When someone was last seen, as a date and time with the gap spelled out.
+ * "Never" is a real answer — a signed-up user who has not messaged since — and
+ * says more than a dash.
+ */
+export const lastActive = (d) => {
+  if (!d) return { text: 'Never active', stale: true };
+  const mins = Math.floor((Date.now() - new Date(d)) / 60000);
+  const when = dateTime(d);
+  if (mins < 2) return { text: 'Active now', stale: false };
+  if (mins < 60) return { text: `${mins}m ago · ${when}`, stale: false };
+  if (mins < 1440) return { text: `${Math.floor(mins / 60)}h ago · ${when}`, stale: false };
+  const days = Math.floor(mins / 1440);
+  return { text: `${days}d ago · ${when}`, stale: days > 30 };
+};
+
 /** "2h", "3d" — the age column on tickets. */
 export const age = (d) => {
   if (!d) return '—';

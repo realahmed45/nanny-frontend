@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api.js';
 import Notes from '../components/Notes.jsx';
 import PersonCalendar from '../components/PersonCalendar.jsx';
+import ReferralsTab from '../components/ReferralsTab.jsx';
 import {
   PageHeader, Table, Badge, Modal, Field, Avatar, Pagination, useToast, ErrorBox, money, date, Tabs,
+  lastActive,
 } from '../components/ui.jsx';
 import { IconSearch, IconEye } from '../components/icons.jsx';
 
@@ -41,6 +43,7 @@ export default function Families() {
   }, [search, page]);
 
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [detailTab, setDetailTab] = useState('profile');
 
   const open = (f) => {
@@ -49,6 +52,42 @@ export default function Families() {
     setDetail(null);
     api(`/families/${f._id}`).then(setDetail).catch(() => setDetail({ family: f }));
   };
+
+  /**
+   * Open whoever a referral row points at. A family opens here in place, so a
+   * chain can be walked without losing the modal; a nanny lives on another
+   * page, so we go there and let it open the profile.
+   */
+  const openReferral = (person) => {
+    if (person.role === 'nanny') {
+      navigate(`/nannies?open=${person._id}`);
+      return;
+    }
+    open({ _id: person._id, fullName: person.fullName });
+  };
+
+  /**
+   * A referral row on the other role's page links here with ?open=<id>.
+   * Without this the link would land on an unchanged list, which is worse
+   * than not linking at all.
+   */
+  useEffect(() => {
+    const id = searchParams.get('open');
+    if (!id) return;
+    api(`/families/${id}`)
+      .then((d) => {
+        const person = d?.family;
+        if (person) open(person);
+      })
+      .catch(() => {})
+      .finally(() => {
+        // Drop the param so a refresh or a close does not reopen it.
+        searchParams.delete('open');
+        setSearchParams(searchParams, { replace: true });
+      });
+    // Only ever acted on once, when the page is entered with the param.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleBlock = async () => {
     try {
@@ -184,22 +223,32 @@ export default function Families() {
               tabs={[
                 { value: 'profile', label: 'Profile' },
                 { value: 'calendar', label: 'Calendar' },
+                { value: 'referrals', label: 'Referrals' },
               ]}
               active={detailTab}
               onChange={setDetailTab}
             />
 
-            {detailTab === 'profile' ? (
+            {detailTab === 'profile' && (
               <FamilyDetail
                 family={detail?.family || selected}
                 extra={detail}
                 onBooking={(b) => navigate(`/bookings?search=${b.bookingNumber}`)}
               />
-            ) : (
+            )}
+
+            {detailTab === 'calendar' && (
               <PersonCalendar
                 role="family"
                 personId={selected._id}
                 onBooking={(e) => navigate(`/bookings?search=${e.bookingNumber}`)}
+              />
+            )}
+
+            {detailTab === 'referrals' && (
+              <ReferralsTab
+                personId={selected._id}
+                onOpenPerson={openReferral}
               />
             )}
           </>
@@ -219,6 +268,10 @@ function FamilyDetail({ family, extra, onBooking }) {
         <div>
           <p className="font-semibold text-white">{family.fullName}</p>
           <p className="text-xs font-mono text-slate-500">{family.phone} · {family.email || 'no email'}</p>
+          {/* Last seen, so an idle account is obvious without digging. */}
+          <p className={`text-[11px] ${lastActive(family.lastSeenAt).stale ? 'text-slate-600' : 'text-slate-400'}`}>
+            Last active: {lastActive(family.lastSeenAt).text}
+          </p>
         </div>
         <span className="ml-auto"><Badge value={family.blocked ? 'suspended' : 'active'} /></span>
       </div>
@@ -316,7 +369,16 @@ function FamilyDetail({ family, extra, onBooking }) {
         </div>
       )}
 
-      <Notes targetType="family" target={family._id} initial={extra?.notes || []} />
+      <Notes
+        targetType="family"
+        target={family._id}
+        initial={extra?.notes || []}
+        bookings={extra?.bookings || []}
+        onNavigate={(id) => {
+          const b = (extra?.bookings || []).find((x) => String(x._id) === String(id));
+          if (b) onBooking?.(b);
+        }}
+      />
     </div>
   );
 }
