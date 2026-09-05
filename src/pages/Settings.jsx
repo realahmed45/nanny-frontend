@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api.js';
 import {
-  PageHeader, Field, Badge, Skeleton, ErrorBox, useToast, dateTime,
+  PageHeader, Field, Badge, Skeleton, ErrorBox, useToast, dateTime, money,
 } from '../components/ui.jsx';
 import { IconCheck, IconX, IconChats } from '../components/icons.jsx';
 
@@ -230,10 +230,10 @@ export default function Settings({ admin }) {
 
         <Panel title="Business Rules">
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Currency">{s.currency || '—'}</Field>
+            <Field label="Currency">Rupiah (Rp)</Field>
             <Field label="Transport Fee">
               {s.transportFee
-                ? `${s.transportFee.min.toLocaleString()} – ${s.transportFee.max.toLocaleString()} ${s.currency || ''}`.trim()
+                ? `${money(s.transportFee.min)} – ${money(s.transportFee.max)}`
                 : '—'}
             </Field>
             <Field label="New Booking Response">{s.newBookingResponseMinutes} min</Field>

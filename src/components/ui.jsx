@@ -107,11 +107,26 @@ export const humanize = (s) =>
 // The platform runs in rupiah, so that is the default rather than USD.
 // /settings can still override it, but the wrong symbol must never flash on
 // screen while that request is in flight.
-let activeCurrency = 'IDR';
-export const setCurrency = (c) => { if (c) activeCurrency = c; };
-
 /** Symbols people actually recognise, where Intl's default is not it. */
 const SYMBOLS = { IDR: 'Rp' };
+
+let activeCurrency = 'IDR';
+
+/**
+ * Every amount the API sends is a rupiah figure. A different currency code
+ * would not convert them, only relabel them — which is how the calendar came
+ * to read "USD 16,220,000" for a day worth Rp 16,220,000. So a setting we do
+ * not have a symbol for is refused rather than displayed.
+ */
+export const setCurrency = (c) => {
+  const want = String(c || '').trim().toUpperCase();
+  if (!want) return;
+  if (!SYMBOLS[want]) {
+    console.warn(`[ui] currency ${want} ignored — amounts are rupiah; showing Rp.`);
+    return;
+  }
+  activeCurrency = want;
+};
 
 export const money = (n, currency = activeCurrency) => {
   const value = Number(n || 0);
@@ -120,7 +135,7 @@ export const money = (n, currency = activeCurrency) => {
   // Anything else falls back to its own code rather than going through Intl,
   // which would render a currency symbol — and a dollar sign on a rupiah
   // platform is how a price gets misread by a factor of fifteen thousand.
-  const symbol = SYMBOLS[currency] || currency;
+  const symbol = SYMBOLS[currency] || SYMBOLS.IDR;
   return `${symbol} ${Math.round(value).toLocaleString('en-US')}`;
 };
 

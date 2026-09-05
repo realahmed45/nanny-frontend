@@ -35,6 +35,22 @@ const statusLabel = (e) => {
   return LABEL[s] || s.replace(/_/g, ' ');
 };
 
+const shortDate = (d) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, {
+  day: 'numeric', month: 'short',
+});
+
+/**
+ * When the booking itself ends — not just this day. A single-day booking would
+ * only repeat the date in the title, so it says nothing.
+ */
+const spanLabel = (e, date) => {
+  if (!e.endDate || e.endDate === e.startDate) return null;
+  const total = e.totalDays > 1 ? ` · ${e.totalDays} days` : '';
+  return e.endDate === date
+    ? `Last day (from ${shortDate(e.startDate)}${total})`
+    : `Runs to ${shortDate(e.endDate)}${total}`;
+};
+
 export default function DayBookingsModal({ date, events, onClose, onBooking, showNanny = true, showFamily = true }) {
   if (!date) return null;
 
@@ -119,6 +135,9 @@ export default function DayBookingsModal({ date, events, onClose, onBooking, sho
 
                 <div className="flex flex-wrap items-center gap-2 mt-1.5 pl-[100px]">
                   <span className="text-[11px] capitalize opacity-80">{statusLabel(e)}</span>
+                  {spanLabel(e, date) && (
+                    <span className="text-[10px] text-slate-500">{spanLabel(e, date)}</span>
+                  )}
                   {e.isEmergency && (
                     <span className="text-[10px] px-1.5 rounded bg-red-500/25 text-red-300">URGENT</span>
                   )}
