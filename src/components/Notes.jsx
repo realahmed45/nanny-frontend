@@ -91,6 +91,19 @@ function NoteTag({ note, targetType, onNavigate }) {
 const NOTE_EDIT_WINDOW_MS = 3 * 60 * 60 * 1000;
 const editable = (n) => Date.now() - new Date(n.createdAt).getTime() <= NOTE_EDIT_WINDOW_MS;
 
+/**
+ * Whether a note gets the glow.
+ *
+ * On a booking: the notes actually about it, as against the ones borrowed
+ * from the people involved for context. On a profile: the notes about one of
+ * her bookings, as against the general ones — glowing every note there would
+ * mark nothing at all. Both answer the same question, which is the one being
+ * scanned for: is this about a job, or about her in general?
+ */
+const glowing = (n, targetType) => (
+  targetType === 'booking' ? !!n.relevant : !!n.bookingRef
+);
+
 /** Label a booking the way an admin would recognise it in a dropdown. */
 function bookingLabel(b) {
   const num = b.bookingNumber || String(b._id).slice(-6);
@@ -210,6 +223,16 @@ export default function Notes({ targetType, target, initial = [], bookings = [],
         </p>
       )}
 
+      {/* Same glow, same meaning: it marks a note about a job. Only worth
+          saying once both kinds are actually on screen. */}
+      {targetType !== 'booking'
+        && notes.some((n) => n.bookingRef) && notes.some((n) => !n.bookingRef) && (
+        <p className="text-xs text-slate-500 mb-3">
+          <span className="text-brand-400">Glowing</span> notes are about a specific booking.
+          The rest are general.
+        </p>
+      )}
+
       {/* ---------------- Composer ---------------- */}
       <div className="rounded-lg border border-ink-800 bg-ink-950/60 p-3 mb-4">
         <textarea
@@ -300,13 +323,14 @@ export default function Notes({ targetType, target, initial = [], bookings = [],
           {notes.map((n) => (
             <div
               key={n._id}
-              /* On a booking, the notes actually about it glow; the rest are
-                 context from the people involved and stay muted. The ring sits
-                 outside the border so it reads as light around the card rather
-                 than a thicker edge — the difference has to survive a glance
-                 down a list where most cards are the muted kind. */
+              /* Notes tied to a booking glow; general ones stay muted. On a
+                 booking that means the notes about it, on a profile the ones
+                 about any of her bookings — either way the glow marks "this
+                 is about a job", which is the distinction being scanned for.
+                 The ring sits outside the border so it reads as light around
+                 the card rather than as a thicker edge. */
               className={`rounded-lg border p-3 transition-shadow ${
-                targetType === 'booking' && n.relevant
+                glowing(n, targetType)
                   ? 'border-brand-500 bg-brand-500/10 ring-2 ring-brand-500/40 shadow-[0_0_20px_-2px_rgba(59,130,246,0.55)]'
                   : 'border-ink-800 bg-ink-950/40'
               }`}
