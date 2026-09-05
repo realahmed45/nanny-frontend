@@ -9,7 +9,7 @@ import DayBookingsModal from '../components/DayBookingsModal.jsx';
 const VIEW_FILTERS = [
   { value: 'all', label: 'All Bookings' },
   { value: 'nannies', label: 'Nannies Only' },
-  { value: 'families', label: 'Families Only' },
+  { value: 'families', label: 'Families/Customers Only' },
   { value: 'blocked', label: 'Blocked Dates' },
 ];
 

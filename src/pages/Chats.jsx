@@ -40,7 +40,7 @@ export default function Chats() {
   };
 
   const threadColumns = [
-    { key: 'family', header: 'Family', render: (r) => (
+    { key: 'family', header: 'Family/Customer', render: (r) => (
       <div>
         <p className="font-medium text-slate-100">{r.family?.fullName || '—'}</p>
         <p className="text-xs text-slate-500">{r.family?.phone}</p>

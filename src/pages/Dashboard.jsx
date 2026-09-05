@@ -84,7 +84,7 @@ export default function Dashboard() {
           hint={users.nannies ? `${Math.round((users.verifiedNannies / users.nannies) * 100)}% verified` : '—'}
         />
         <StatCard
-          label="Active Families" value={users.families ?? 0} tone="violet" icon={<IconFamily size={17} />}
+          label="Active Families/Customers" value={users.families ?? 0} tone="violet" icon={<IconFamily size={17} />}
           hint={`${users.suspendedFamilies || 0} suspended`}
         />
         <StatCard
@@ -199,7 +199,7 @@ export default function Dashboard() {
           <table className="w-full">
             <thead className="border-b border-ink-800">
               <tr>
-                {['Booking ID', 'Family', 'Nanny', 'Date', 'Type', 'Status', 'Payment'].map((h) => (
+                {['Booking ID', 'Family/Customer', 'Nanny', 'Date', 'Type', 'Status', 'Payment'].map((h) => (
                   <th key={h} className="th">{h}</th>
                 ))}
               </tr>

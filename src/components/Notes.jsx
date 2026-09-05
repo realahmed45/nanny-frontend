@@ -47,8 +47,11 @@ function NoteTag({ note, targetType, onNavigate }) {
 
   // Where the note was written. On a booking this is the thing worth saying,
   // since the list mixes notes from the booking and from both profiles.
+  // "Customer" rather than the fuller "Family/Customer" used elsewhere: this
+  // chip shares a line with the booking badge, author and timestamp, and the
+  // longer label pushes the rest of the row off screen.
   const source = targetType === 'booking' && note.targetType !== 'booking'
-    ? (note.targetType === 'family' ? 'Family' : 'Nanny')
+    ? (note.targetType === 'family' ? 'Customer' : 'Nanny')
     : null;
 
   const chip = 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 mr-1.5';

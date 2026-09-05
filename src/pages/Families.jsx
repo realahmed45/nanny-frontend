@@ -111,7 +111,7 @@ export default function Families() {
 
   const columns = [
     {
-      key: 'id', header: 'Family ID',
+      key: 'id', header: 'Customer ID',
       render: (f) => <span className="font-mono text-xs text-slate-500">F-{String(f._id).slice(-4).toUpperCase()}</span>,
     },
     {
@@ -184,7 +184,7 @@ export default function Families() {
 
   return (
     <>
-      <PageHeader title="Families" subtitle={`${data.total} accounts · ${active} active`} />
+      <PageHeader title="Families/Customers" subtitle={`${data.total} accounts · ${active} active`} />
 
       <div className="flex flex-wrap gap-3 mb-5">
         <div className="relative flex-1 min-w-[220px] max-w-sm">
@@ -208,7 +208,7 @@ export default function Families() {
 
       <Modal
         open={Boolean(selected)}
-        title={selected?.fullName || 'Family'}
+        title={selected?.fullName || 'Family/Customer'}
         onClose={() => setSelected(null)}
         wide
         footer={

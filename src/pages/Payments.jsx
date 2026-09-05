@@ -10,7 +10,7 @@ import {
 
 const TABS = [
   { value: 'review', label: 'Awaiting Review' },
-  { value: 'family', label: 'Family Payments' },
+  { value: 'family', label: 'Family/Customer Payments' },
   { value: 'nanny', label: 'Nanny Payouts' },
   { value: 'refunds', label: 'Refunds' },
 ];
@@ -125,7 +125,7 @@ export default function Payments() {
       key: 'booking', header: 'Booking',
       render: (p) => <span className="font-mono text-xs">{p.booking?.bookingNumber ? `#${p.booking.bookingNumber}` : '—'}</span>,
     },
-    { key: 'family', header: 'Family', render: (p) => p.family?.fullName || '—' },
+    { key: 'family', header: 'Family/Customer', render: (p) => p.family?.fullName || '—' },
     { key: 'amount', header: 'Amount', render: (p) => <span className="font-mono text-xs">{money(p.amount)}</span> },
     { key: 'kind', header: 'Type', render: (p) => <span className="text-xs">{humanize(p.kind)}</span> },
     {
@@ -198,7 +198,7 @@ export default function Payments() {
           icon={<IconClock size={17} />} tone="amber"
         />
         <StatCard
-          label="Family Payments This Week"
+          label="Family/Customer Payments This Week"
           value={money(summary?.familyPaymentsThisWeek?.total)}
           hint={`${summary?.familyPaymentsThisWeek?.count || 0} verified`}
           icon={<IconPayments size={17} />} tone="blue"
@@ -297,7 +297,7 @@ export default function Payments() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <Field label={isPayout ? 'Nanny' : 'Family'}>
+              <Field label={isPayout ? 'Nanny' : 'Family/Customer'}>
                 {isPayout ? selected.nanny?.fullName : selected.family?.fullName}
               </Field>
               <Field label="Booking">

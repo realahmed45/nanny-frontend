@@ -270,7 +270,8 @@ export default function Nannies() {
                 { value: 'profile', label: 'Profile' },
                 { value: 'calendar', label: 'Calendar' },
                 { value: 'media', label: 'Nanny videos' },
-                { value: 'referrals', label: 'Referrals' },
+                { value: 'referrals', label: 'Customers/families they referred' },
+                { value: 'referred-nannies', label: 'Nannies they referred' },
               ]}
               active={detailTab}
               onChange={setDetailTab}
@@ -303,6 +304,15 @@ export default function Nannies() {
               <ReferralsTab
                 personId={selected._id}
                 onOpenPerson={openReferral}
+                role="family"
+              />
+            )}
+
+            {detailTab === 'referred-nannies' && (
+              <ReferralsTab
+                personId={selected._id}
+                onOpenPerson={openReferral}
+                role="nanny"
               />
             )}
           </>

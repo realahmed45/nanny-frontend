@@ -252,7 +252,7 @@ export default function GeneralCalendar() {
               <span>
                 <span className="text-sm text-white">Refuse bookings on Nyepi</span>
                 <span className="block text-xs text-slate-500">
-                  Families choosing this date are told why and asked for another.
+                  Families/customers choosing this date are told why and asked for another.
                   Multi-day bookings skip the date and are not charged for it.
                 </span>
               </span>

@@ -163,7 +163,7 @@ export default function Callbacks() {
     <>
       <PageHeader
         title="Call Straight Away"
-        subtitle="Families waiting on a call — no nanny matched, or they asked for an agent"
+        subtitle="Families/customers waiting on a call — no nanny matched, or they asked for an agent"
       />
 
       <div className="grid gap-4 sm:grid-cols-3 mb-6">

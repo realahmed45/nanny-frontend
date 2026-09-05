@@ -11,7 +11,7 @@ import {
 const NAV = [
   { to: '/', label: 'Dashboard', Icon: IconDashboard, end: true },
   { to: '/nannies', label: 'Nannies', Icon: IconNanny, count: 'nannies' },
-  { to: '/families', label: 'Families', Icon: IconFamily },
+  { to: '/families', label: 'Families/Customers', Icon: IconFamily },
   { to: '/callbacks', label: 'Call Straight Away', Icon: IconPhone, count: 'callbacks' },
   { to: '/bookings', label: 'Bookings', Icon: IconBookings, count: 'bookings' },
   { to: '/calendar', label: 'Calendar', Icon: IconCalendar },

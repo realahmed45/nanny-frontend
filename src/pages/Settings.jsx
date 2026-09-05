@@ -266,7 +266,7 @@ export default function Settings({ admin }) {
               <div>
                 <p className="text-sm text-slate-200">Not configured</p>
                 <p className="text-xs text-slate-500">
-                  Families cannot be told where to transfer. Set BANK_ACCOUNT_NAME,
+                  Families/customers cannot be told where to transfer. Set BANK_ACCOUNT_NAME,
                   BANK_ACCOUNT_NUMBER and BANK_NAME on the server.
                 </p>
               </div>

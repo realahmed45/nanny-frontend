@@ -17,12 +17,12 @@ import {
  * that gives it meaning, and only within its three-hour window.
  */
 
-const TARGET_LABEL = { family: 'Family', nanny: 'Nanny', booking: 'Booking' };
+const TARGET_LABEL = { family: 'Family/Customer', nanny: 'Nanny', booking: 'Booking' };
 
 const FILTERS = [
   { value: '', label: 'Everything' },
   { value: 'nanny', label: 'Nannies' },
-  { value: 'family', label: 'Families' },
+  { value: 'family', label: 'Families/Customers' },
   { value: 'booking', label: 'Bookings' },
 ];
 

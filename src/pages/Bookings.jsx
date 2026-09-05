@@ -96,7 +96,7 @@ export default function Bookings() {
       key: 'id', header: 'Booking ID',
       render: (b) => <span className="font-mono text-xs text-brand-400">#{b.bookingNumber}</span>,
     },
-    { key: 'family', header: 'Family', render: (b) => b.family?.fullName || '—' },
+    { key: 'family', header: 'Family/Customer', render: (b) => b.family?.fullName || '—' },
     { key: 'nanny', header: 'Nanny', render: (b) => b.nanny?.fullName || <span className="text-slate-600">Unassigned</span> },
     {
       key: 'date', header: 'Date',
@@ -275,7 +275,7 @@ function BookingDetail({ booking, extra, refund }) {
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <Field label="Family">{b.family?.fullName}</Field>
+        <Field label="Family/Customer">{b.family?.fullName}</Field>
         <Field label="Nanny">{b.nanny?.fullName || 'Unassigned'}</Field>
         <Field label="Type">{b.isMultiDay ? 'Multiple days' : 'Single day'}</Field>
         <Field label="Dates">

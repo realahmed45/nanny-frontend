@@ -10,7 +10,7 @@ import { Skeleton, ErrorBox, Avatar, date, money } from './ui.jsx';
  * walked in either direction without going back to a list and searching.
  */
 
-const ROLE_LABEL = { family: 'Family', nanny: 'Nanny' };
+const ROLE_LABEL = { family: 'Family/Customer', nanny: 'Nanny' };
 
 /** A claim that is settled, still takeable, or lapsed — worth saying plainly. */
 const STATUS_NOTE = {
@@ -67,7 +67,14 @@ function Row({ person, onOpen }) {
   );
 }
 
-export default function ReferralsTab({ personId, onOpenPerson }) {
+/**
+ * @param role  Show only the people referred who have this role. A nanny
+ *              recruits two different things — customers and colleagues —
+ *              and they are read for different reasons, so each gets its own
+ *              tab rather than a mixed list to sort through by eye. Omit to
+ *              show everyone, which is what a family's page still does.
+ */
+export default function ReferralsTab({ personId, onOpenPerson, role }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -86,7 +93,12 @@ export default function ReferralsTab({ personId, onOpenPerson }) {
   if (loading) return <Skeleton rows={4} />;
 
   const inbound = data?.inbound;
-  const outbound = data?.outbound || [];
+  const all = data?.outbound || [];
+  const outbound = role ? all.filter((p) => p.role === role) : all;
+
+  const noun = role === 'family' ? 'customers'
+    : role === 'nanny' ? 'nannies'
+      : 'anyone';
 
   return (
     <div className="space-y-6">
@@ -105,13 +117,16 @@ export default function ReferralsTab({ personId, onOpenPerson }) {
 
       <section>
         <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">
-          Referred by them
+          {role === 'family' ? 'Customers/families they referred'
+            : role === 'nanny' ? 'Nannies they referred'
+              : 'Referred by them'}
           <span className="ml-2 text-slate-600">{outbound.length}</span>
         </h4>
 
         {outbound.length === 0 ? (
           <p className="text-xs text-slate-600 rounded-lg border border-dashed border-ink-800 px-3 py-4 text-center">
-            They have not referred anyone yet.
+            {role ? `They have not referred any ${noun} yet.`
+              : 'They have not referred anyone yet.'}
           </p>
         ) : (
           <div className="space-y-1.5">
@@ -121,9 +136,13 @@ export default function ReferralsTab({ personId, onOpenPerson }) {
           </div>
         )}
 
-        {data?.earnings > 0 && (
+        {/* Earnings cover every referral, not just the ones on this tab, so
+            they are stated once rather than repeated as if each tab earned
+            them separately. */}
+        {data?.earnings > 0 && role !== 'nanny' && (
           <p className="text-xs text-slate-500 mt-3">
-            Referral earnings: <span className="font-mono text-emerald-400">{money(data.earnings)}</span>
+            Referral earnings (all referrals):{' '}
+            <span className="font-mono text-emerald-400">{money(data.earnings)}</span>
           </p>
         )}
       </section>
