@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import api from '../lib/api.js';
 import { Skeleton, ErrorBox, money } from './ui.jsx';
 import WeekCalendar, { startOfWeek } from './WeekCalendar.jsx';
+import DayBookingsModal from './DayBookingsModal.jsx';
 
 /**
  * One person's month.
@@ -249,9 +250,12 @@ export default function PersonCalendar({ role, personId, onBooking }) {
                             </div>
                           ))}
                           {dayEvents.length > 2 && (
-                            <p className="text-[10px] text-brand-400 px-1">
-                              +{dayEvents.length - 2} more
-                            </p>
+                            <button
+                              type="button"
+                              className="w-full text-[10px] font-medium text-brand-300 bg-brand-500/10 hover:bg-brand-500/25 border border-brand-500/30 rounded px-1 py-0.5 transition-colors"
+                            >
+                              +{dayEvents.length - 2} more →
+                            </button>
                           )}
                         </div>
                       </>
@@ -264,52 +268,14 @@ export default function PersonCalendar({ role, personId, onBooking }) {
         </div>
       )}
 
-      {/* The chosen day in full, since a cell can only ever hint. */}
-      {selected && selected.length > 0 && (
-        <div className="mt-4 rounded-lg border border-ink-800 bg-ink-950/60 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <h5 className="text-xs font-mono uppercase tracking-wider text-slate-500">
-              {new Date(`${openDate}T00:00:00`).toLocaleDateString(undefined, {
-                weekday: 'long', day: 'numeric', month: 'long',
-              })}
-            </h5>
-            <button className="text-xs text-slate-500 hover:text-slate-300" onClick={() => setOpenDate(null)}>
-              Close
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {selected.map((e, i) => (
-              <div
-                key={i}
-                onClick={e.bookingNumber ? () => onBooking?.(e) : undefined}
-                className={`flex flex-wrap items-center gap-3 rounded px-2.5 py-2 border ${toneFor(e)} ${
-                  e.bookingNumber ? 'cursor-pointer' : ''
-                }`}
-              >
-                <span className="font-mono text-xs w-24">
-                  {e.time ? `${e.time}${e.endTime ? `–${e.endTime}` : ''}` : '—'}
-                </span>
-                <span className="text-xs flex-1 min-w-[120px]">
-                  {e.status === 'blocked'
-                    ? 'Marked unavailable'
-                    : role === 'nanny' ? e.family : (e.nanny || 'Nanny not yet assigned')}
-                </span>
-                {e.bookingNumber && (
-                  <span className="font-mono text-[11px] opacity-70">#{e.bookingNumber}</span>
-                )}
-                {e.hours ? <span className="text-[11px] opacity-70">{e.hours}h</span> : null}
-                {e.isEmergency && (
-                  <span className="text-[10px] px-1 rounded bg-red-500/20 text-red-300">URGENT</span>
-                )}
-                {e.rateLabel && (
-                  <span className="text-[10px] opacity-70">{e.rateLabel}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <DayBookingsModal
+        date={openDate}
+        events={selected || []}
+        onClose={() => setOpenDate(null)}
+        onBooking={(e) => { setOpenDate(null); onBooking?.(e); }}
+        showNanny={role !== 'nanny'}
+        showFamily={role !== 'family'}
+      />
 
       {!loading && events.length === 0 && span === 'month' && (
         <p className="text-xs text-slate-600 text-center py-6">

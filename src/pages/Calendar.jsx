@@ -4,6 +4,7 @@ import api from '../lib/api.js';
 import { PageHeader, FilterPills, Skeleton, ErrorBox, Tabs } from '../components/ui.jsx';
 import GeneralCalendar from './GeneralCalendar.jsx';
 import WeekCalendar, { startOfWeek } from '../components/WeekCalendar.jsx';
+import DayBookingsModal from '../components/DayBookingsModal.jsx';
 
 const VIEW_FILTERS = [
   { value: 'all', label: 'All Bookings' },
@@ -230,9 +231,12 @@ export default function Calendar() {
                               </div>
                             ))}
                             {dayEvents.length > 3 && (
-                              <p className="text-[10px] text-brand-400 px-1 hover:text-brand-300">
-                                +{dayEvents.length - 3} more — click to see all
-                              </p>
+                              <button
+                                type="button"
+                                className="w-full text-[10px] font-medium text-brand-300 bg-brand-500/10 hover:bg-brand-500/25 border border-brand-500/30 rounded px-1 py-1 transition-colors"
+                              >
+                                +{dayEvents.length - 3} more →
+                              </button>
                             )}
                           </div>
                         </>
@@ -241,49 +245,6 @@ export default function Calendar() {
                   );
                 })}
               </div>
-            </div>
-          </div>
-        )}
-
-        {span === 'month' && openDate && (byDate[openDate] || []).length > 0 && (
-          <div className="mt-4 rounded-lg border border-ink-800 bg-ink-950/60 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h5 className="text-xs font-mono uppercase tracking-wider text-slate-500">
-                {new Date(`${openDate}T00:00:00`).toLocaleDateString(undefined, {
-                  weekday: 'long', day: 'numeric', month: 'long',
-                })}
-                <span className="ml-2 text-slate-600">
-                  {(byDate[openDate] || []).length} booking(s)
-                </span>
-              </h5>
-              <button
-                className="text-xs text-slate-500 hover:text-slate-300"
-                onClick={() => setOpenDate(null)}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="space-y-1.5">
-              {(byDate[openDate] || []).map((e, i) => (
-                <div
-                  key={i}
-                  onClick={() => openBooking(e)}
-                  className={`flex flex-wrap items-center gap-3 rounded px-2.5 py-2 border ${
-                    EVENT_STYLES[e.status] || EVENT_STYLES.cancelled
-                  } ${e.bookingNumber ? 'cursor-pointer' : ''}`}
-                >
-                  <span className="font-mono text-xs w-14">{e.time || '—'}</span>
-                  <span className="text-xs flex-1 min-w-[120px]">{e.family || e.label}</span>
-                  <span className="text-xs opacity-80 w-28 truncate">
-                    {e.nanny || 'Needs a nanny'}
-                  </span>
-                  {e.bookingNumber && (
-                    <span className="font-mono text-[11px] opacity-70">#{e.bookingNumber}</span>
-                  )}
-                  {e.hours ? <span className="text-[11px] opacity-70">{e.hours}h</span> : null}
-                </div>
-              ))}
             </div>
           </div>
         )}
@@ -297,6 +258,13 @@ export default function Calendar() {
           ))}
         </div>
       </div>
+
+      <DayBookingsModal
+        date={openDate}
+        events={openDate ? byDate[openDate] || [] : []}
+        onClose={() => setOpenDate(null)}
+        onBooking={(e) => { setOpenDate(null); openBooking(e); }}
+      />
       </>
       )}
     </>
