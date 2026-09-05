@@ -117,12 +117,27 @@ export default function Notes({ targetType, target, initial = [], bookings = [],
   const [editBody, setEditBody] = useState('');
   const [editRef, setEditRef] = useState('');
 
-  useEffect(() => { setNotes(initial); }, [target]);
-
   const reload = () =>
     api(`/notes/${targetType}/${target}`)
       .then((r) => setNotes(r.items || []))
       .catch(() => {});
+
+  /**
+   * Own the list rather than mirroring the parent's copy.
+   *
+   * The profile opens before its notes have loaded and hands down [], then the
+   * real list once the fetch resolves. Mirroring that meant either missing the
+   * second hand-off — the bug that left profiles looking empty — or clobbering
+   * our own reload on every re-render. Fetching once on open avoids both;
+   * `initial` is only a seed so the list is not blank while that runs.
+   */
+  useEffect(() => {
+    setNotes(initial);
+    if (target) reload();
+    // Re-fetching per target is the point; `initial` is deliberately not a
+    // dependency, since a new array identity each render would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetType, target]);
 
   const addAttachment = () => {
     const url = attachUrl.trim();
