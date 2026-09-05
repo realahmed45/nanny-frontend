@@ -38,46 +38,60 @@ const KIND_ICON = { image: '🖼️', pdf: '📄', document: '📎', other: '�
  * whose it is, otherwise it reads as if it were written about this booking.
  */
 function NoteTag({ note, targetType, onNavigate }) {
-  const own = note.targetType === 'booking';
+  // Whichever booking this note is about: its own, if it was written on one,
+  // or the one it was filed against from a profile.
+  const bookingId = note.targetType === 'booking' ? note.target : note.bookingRef;
+  const num = bookingId
+    ? note.bookingNumber || String(bookingId).slice(-6)
+    : null;
 
-  if (targetType === 'booking') {
-    if (own) return null;
-    const who = note.targetType === 'family' ? 'Family' : 'Nanny';
-    return (
-      <span
-        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 mr-1.5 ${
-          note.relevant ? 'bg-brand-500/20 text-brand-400' : 'bg-ink-800 text-slate-400'
-        }`}
-        title={note.relevant
-          ? `Filed against this booking on the ${who.toLowerCase()}'s profile`
-          : `A general note from the ${who.toLowerCase()}'s profile`}
-      >
-        <span>{note.relevant ? '📅' : '📌'}</span>
-        <span>{who}</span>
-      </span>
-    );
-  }
+  // Where the note was written. On a booking this is the thing worth saying,
+  // since the list mixes notes from the booking and from both profiles.
+  const source = targetType === 'booking' && note.targetType !== 'booking'
+    ? (note.targetType === 'family' ? 'Family' : 'Nanny')
+    : null;
 
-  if (!note.bookingRef) {
-    return (
-      <span
-        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 mr-1.5 bg-ink-800 text-slate-400"
-        title="A general note, not about a particular booking"
-      >
-        📌 General
-      </span>
-    );
-  }
+  const chip = 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 mr-1.5';
 
-  const num = note.bookingNumber || String(note.bookingRef).slice(-6);
   return (
-    <button
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 mr-1.5 bg-brand-500/20 text-brand-400 hover:bg-brand-500/30"
-      onClick={() => onNavigate?.(note.bookingRef)}
-      title={`About booking #${num} — open it`}
-    >
-      📅 #{num}
-    </button>
+    <>
+      {source && (
+        <span
+          className={`${chip} bg-ink-800 text-slate-400`}
+          title={`Written on the ${source.toLowerCase()}'s profile`}
+        >
+          {source}
+        </span>
+      )}
+
+      {/* The booking number is always shown when there is one — it is how a
+          note is identified, and dropping it forced a click to find out.
+          Only a button where there is somewhere to go: inside that booking
+          already, it is a label. */}
+      {num ? (onNavigate ? (
+        <button
+          className={`${chip} bg-brand-500/20 text-brand-400 hover:bg-brand-500/30`}
+          onClick={() => onNavigate(bookingId)}
+          title={`About booking #${num} — open it`}
+        >
+          📅 #{num}
+        </button>
+      ) : (
+        <span
+          className={`${chip} bg-brand-500/20 text-brand-400`}
+          title={`About booking #${num}`}
+        >
+          📅 #{num}
+        </span>
+      )) : (
+        <span
+          className={`${chip} bg-ink-800 text-slate-400`}
+          title="A general note, not about a particular booking"
+        >
+          📌 General
+        </span>
+      )}
+    </>
   );
 }
 
