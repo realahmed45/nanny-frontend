@@ -10,6 +10,13 @@ import { useToast, date } from './ui.jsx';
 const MAX_VIDEOS = 2;
 const MAX_PHOTOS = 6;
 
+/** Mirrors the reasons the review queue offers. */
+const REJECTION_LABEL = {
+  bad_quality: 'Bad quality',
+  misconduct: 'Misconduct',
+  other: 'Other reason',
+};
+
 /**
  * Everything a nanny has sent showing herself at work — her videos and her
  * photos, in one place.
@@ -41,10 +48,28 @@ function Controls({ item, onApprove, onFeature, onRemove, full }) {
         <span className="text-xs text-slate-400 truncate">
           {item.title || item.caption || (item.uploadedAt ? date(item.uploadedAt) : '—')}
         </span>
-        {approved
-          ? <span className="text-xs text-slate-500 shrink-0">Approved</span>
-          : <span className="text-xs text-amber-400 shrink-0">Awaiting review</span>}
+        {/* A rejected item is kept, so its state has to be visible — otherwise
+            it reads as merely unreviewed and gets judged twice. */}
+        {item.rejectedAt
+          ? (
+            <span
+              className="text-xs text-red-400 shrink-0"
+              title={item.rejectionDetail || REJECTION_LABEL[item.rejectionReason] || 'Rejected'}
+            >
+              Rejected
+            </span>
+          )
+          : approved
+            ? <span className="text-xs text-slate-500 shrink-0">Approved</span>
+            : <span className="text-xs text-amber-400 shrink-0">Awaiting review</span>}
       </div>
+
+      {item.rejectedAt && (
+        <p className="text-[10px] text-red-400/70 mt-1 px-1">
+          {item.rejectionDetail || REJECTION_LABEL[item.rejectionReason] || 'Turned down'}
+          {' — she was told.'}
+        </p>
+      )}
 
       {/* The box that actually puts it in front of families. Disabled rather
           than hidden when the profile is full, so the reason is visible. */}

@@ -37,6 +37,15 @@ export default function Nannies() {
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [queueCount, setQueueCount] = useState(0);
+
+  // How much is waiting to be reviewed. Fetched once on open: a stale count
+  // by a few minutes is fine, and the queue page itself is authoritative.
+  useEffect(() => {
+    api('/media-queue')
+      .then((q) => setQueueCount(q.waiting || 0))
+      .catch(() => {});
+  }, []);
 
   const load = () => {
     setLoading(true);
@@ -211,6 +220,18 @@ export default function Nannies() {
       <PageHeader
         title="Nannies"
         subtitle={`${data.total} registered · ${verified} verified`}
+        actions={
+          // The count is the point: an empty queue should look empty, and a
+          // backlog should be visible without opening anything.
+          <button className="btn-ghost" onClick={() => navigate('/media-queue')}>
+            Videos to be approved
+            {queueCount > 0 && (
+              <span className="ml-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300">
+                {queueCount}
+              </span>
+            )}
+          </button>
+        }
       />
 
       <div className="flex flex-wrap gap-3 mb-5">
