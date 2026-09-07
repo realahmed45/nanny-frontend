@@ -3,6 +3,14 @@ import api from '../lib/api.js';
 import { useToast, date } from './ui.jsx';
 
 /**
+ * How many of each can appear on a public profile. The archive behind them is
+ * unlimited; these cap only what a family sees. Mirrors the server, which
+ * enforces them for real.
+ */
+const MAX_VIDEOS = 2;
+const MAX_PHOTOS = 6;
+
+/**
  * Everything a nanny has sent showing herself at work — her videos and her
  * photos, in one place.
  *
@@ -15,21 +23,52 @@ import { useToast, date } from './ui.jsx';
  * show other people's children.
  */
 
-/** One approve/hide/delete row, shared by both kinds. */
-function Controls({ item, live, onToggle, onRemove }) {
+/**
+ * The two decisions on one item, kept visibly separate.
+ *
+ * Approving says the item is safe to show. Ticking the box says it should
+ * actually appear on her profile. Collapsing them into one control was the
+ * mistake worth avoiding: approving everything she sends is routine, choosing
+ * what represents her is not.
+ */
+function Controls({ item, onApprove, onFeature, onRemove, full }) {
+  const approved = !!item.approved;
+  const featured = approved && !!item.featured;
+
   return (
     <>
       <div className="flex items-center justify-between mt-2 px-1 gap-2">
         <span className="text-xs text-slate-400 truncate">
           {item.title || item.caption || (item.uploadedAt ? date(item.uploadedAt) : '—')}
         </span>
-        {live
-          ? <span className="text-xs text-emerald-400 shrink-0">Live to families</span>
+        {approved
+          ? <span className="text-xs text-slate-500 shrink-0">Approved</span>
           : <span className="text-xs text-amber-400 shrink-0">Awaiting review</span>}
       </div>
+
+      {/* The box that actually puts it in front of families. Disabled rather
+          than hidden when the profile is full, so the reason is visible. */}
+      <label
+        className={`flex items-center gap-2 mt-2 px-1 text-xs ${
+          approved && (featured || !full) ? 'cursor-pointer text-slate-300' : 'text-slate-600 cursor-not-allowed'
+        }`}
+        title={!approved ? 'Approve it first'
+          : (full && !featured) ? 'The profile is full — untick another first'
+            : 'Show this on her public profile'}
+      >
+        <input
+          type="checkbox"
+          className="accent-brand-500"
+          checked={featured}
+          disabled={!approved || (full && !featured)}
+          onChange={() => onFeature(!featured)}
+        />
+        Show on profile
+      </label>
+
       <div className="flex gap-2 mt-2 px-1">
-        <button className="btn-ghost text-xs" onClick={onToggle}>
-          {live ? 'Hide from families' : 'Approve'}
+        <button className="btn-ghost text-xs" onClick={() => onApprove(!approved)}>
+          {approved ? 'Un-approve' : 'Approve'}
         </button>
         <button className="btn-ghost text-xs text-red-400" onClick={onRemove}>
           Delete
@@ -95,12 +134,22 @@ export default function MediaTab({ nanny, onChanged }) {
     }
   };
 
+  const noun = (kind) => (kind === 'video' ? 'Video' : 'Photo');
+
   const setApproved = (kind, item, approved) => run(
     () => api(`/nannies/${nanny._id}/${kind}s/${item._id}`, {
       method: 'PATCH', body: { approved },
     }),
-    approved ? `${kind === 'video' ? 'Video' : 'Photo'} is now visible to families.`
-      : `${kind === 'video' ? 'Video' : 'Photo'} hidden from families.`,
+    approved ? `${noun(kind)} approved. Tick "Show on profile" to display it.`
+      : `${noun(kind)} un-approved and removed from her profile.`,
+  );
+
+  const setFeatured = (kind, item, featured) => run(
+    () => api(`/nannies/${nanny._id}/${kind}s/${item._id}`, {
+      method: 'PATCH', body: { featured },
+    }),
+    featured ? `${noun(kind)} is now on her profile.`
+      : `${noun(kind)} removed from her profile.`,
   );
 
   const remove = (kind, item) => run(
@@ -118,6 +167,10 @@ export default function MediaTab({ nanny, onChanged }) {
 
   const waiting = [...videos, ...photos].filter((m) => !m.approved).length;
 
+  // What is actually on her profile, against what it can hold.
+  const shownVideos = videos.filter((v) => v.approved && v.featured).length;
+  const shownPhotos = photos.filter((p) => p.approved && p.featured).length;
+
   return (
     <div className="space-y-6">
       {toast}
@@ -128,10 +181,22 @@ export default function MediaTab({ nanny, onChanged }) {
         </p>
       )}
 
+      {/* Approving is a safety check; the tick box is what families see.
+          Said once, plainly, because conflating the two is the easy mistake. */}
+      <p className="text-xs text-slate-500 rounded-lg border border-ink-800 bg-ink-950/40 px-3 py-2">
+        Approving means the item has been checked — it does <span className="text-slate-300">not</span> put it
+        on her profile. Only items with <span className="text-slate-300">Show on profile</span> ticked are
+        visible to families: up to {MAX_VIDEOS} videos and {MAX_PHOTOS} photos. Everything else stays in
+        her records.
+      </p>
+
       <section>
         <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">
           Videos
           <span className="ml-2 text-slate-600">{videos.length}</span>
+          <span className={`ml-2 normal-case ${shownVideos >= MAX_VIDEOS ? 'text-amber-400' : 'text-slate-600'}`}>
+            {shownVideos}/{MAX_VIDEOS} on profile
+          </span>
         </h4>
 
         <AddForm kind="video" onAdd={(url, label) => add('video', url, label)} />
@@ -153,8 +218,9 @@ export default function MediaTab({ nanny, onChanged }) {
                 />
                 <Controls
                   item={v}
-                  live={v.approved}
-                  onToggle={() => setApproved('video', v, !v.approved)}
+                  full={shownVideos >= MAX_VIDEOS}
+                  onApprove={(on) => setApproved('video', v, on)}
+                  onFeature={(on) => setFeatured('video', v, on)}
                   onRemove={() => remove('video', v)}
                 />
               </div>
@@ -167,6 +233,9 @@ export default function MediaTab({ nanny, onChanged }) {
         <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">
           Photos
           <span className="ml-2 text-slate-600">{photos.length}</span>
+          <span className={`ml-2 normal-case ${shownPhotos >= MAX_PHOTOS ? 'text-amber-400' : 'text-slate-600'}`}>
+            {shownPhotos}/{MAX_PHOTOS} on profile
+          </span>
         </h4>
 
         <AddForm kind="photo" onAdd={(url, label) => add('photo', url, label)} />
@@ -190,8 +259,9 @@ export default function MediaTab({ nanny, onChanged }) {
                 </a>
                 <Controls
                   item={p}
-                  live={p.approved}
-                  onToggle={() => setApproved('photo', p, !p.approved)}
+                  full={shownPhotos >= MAX_PHOTOS}
+                  onApprove={(on) => setApproved('photo', p, on)}
+                  onFeature={(on) => setFeatured('photo', p, on)}
                   onRemove={() => remove('photo', p)}
                 />
               </div>

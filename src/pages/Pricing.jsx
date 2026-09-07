@@ -43,6 +43,10 @@ export default function Pricing() {
   const [discount, setDiscount] = useState({
     validityDays: 30, neverExpires: false, stackReferrals: true,
   });
+  const [emergency, setEmergency] = useState({ surcharge: 50000 });
+  const [social, setSocial] = useState({
+    enabled: true, validityDays: 2, requireInstagram: true, requireWhatsapp: true,
+  });
 
   const load = () => {
     setLoading(true);
@@ -51,6 +55,12 @@ export default function Pricing() {
         setStandard({ ...(s.pricing?.standard || {}) });
         setReferred({ ...(s.pricing?.referred || {}) });
         setDiscount({ ...(s.referralDiscount || {}) });
+        // Unset means the server's own default, which it reports back to us.
+        setEmergency({ surcharge: s.emergency?.surcharge ?? s.emergencySurcharge ?? 50000 });
+        setSocial({
+          enabled: true, validityDays: 2, requireInstagram: true, requireWhatsapp: true,
+          ...(s.socialDiscount || {}),
+        });
         setError(null);
       })
       .catch((e) => setError(e.message))
@@ -67,6 +77,8 @@ export default function Pricing() {
         body: {
           pricing: { standard, referred, extraChildShare: 0.35 },
           referralDiscount: discount,
+          emergency: { surcharge: Number(emergency.surcharge) || 0 },
+          socialDiscount: social,
         },
       });
       notify('Pricing saved. New bookings use these rates immediately.');
@@ -250,6 +262,115 @@ export default function Pricing() {
             ? 'A family who refers someone keeps referred pricing indefinitely.'
             : `A family who refers someone pays ${money(referred[1] || 0)}/hour instead of ${money(standard[1] || 0)}/hour for ${discount.stackReferrals ? 'the accumulated' : 'the next'} ${discount.validityDays || 0} days.`}
         </p>
+      </div>
+
+      {/* ---------------- Emergency surcharge ---------------- */}
+      <div className="card p-5 mt-5">
+        <h3 className="text-lg font-semibold text-white mb-1">Emergency bookings</h3>
+        <p className="text-sm text-slate-400 mb-5">
+          A same-day request pulls a nanny across town at no notice, so the transport
+          fee rises. The nanny collects this in cash when she arrives — it is never
+          added to what the family transfers.
+        </p>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div>
+            <label className="block text-sm text-slate-300 mb-2">Extra on top of transport</label>
+            <RateInput
+              value={Number(emergency.surcharge)}
+              onChange={(v) => setEmergency({ surcharge: v })}
+            />
+            <p className="text-xs text-slate-500 mt-2">
+              Set to 0 to turn the surcharge off.
+            </p>
+          </div>
+
+          {/* The rule stated as the numbers an operator will actually be asked
+              about, rather than left to be worked out from the fee alone. */}
+          <div>
+            <label className="block text-sm text-slate-300 mb-2">What a family pays</label>
+            <div className="rounded-lg border border-ink-800 bg-ink-950/40 p-3 space-y-1.5">
+              {[50000, 100000].map((base) => (
+                <div key={base} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400 font-mono">{money(base)}</span>
+                  <span className="text-slate-600">→</span>
+                  <span className="text-white font-mono">
+                    {money(base + (Number(emergency.surcharge) || 0))}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              Normal transport fee → what an emergency costs.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ---------------- Follow & save ---------------- */}
+      <div className="card p-5 mt-5">
+        <h3 className="text-lg font-semibold text-white mb-1">Follow &amp; Save discount</h3>
+        <p className="text-sm text-slate-400 mb-5">
+          Referred pricing for following us on Instagram and saving our number. Both are
+          confirmed by hand in the <span className="text-slate-300">Follow &amp; Save</span> tab.
+        </p>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div>
+            <label className="block text-sm text-slate-300 mb-2">Discount duration</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="1"
+                max="365"
+                className="input font-mono w-32"
+                value={social.validityDays ?? ''}
+                disabled={!social.enabled}
+                onChange={(e) => setSocial((p) => ({
+                  ...p, validityDays: e.target.value === '' ? '' : Number(e.target.value),
+                }))}
+              />
+              <span className="text-sm text-slate-400">days from when both are confirmed</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-300 mb-2">Requirements</label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={!!social.enabled}
+                onChange={(e) => setSocial((p) => ({ ...p, enabled: e.target.checked }))}
+              />
+              <span>
+                <span className="text-sm text-white">Offer this discount</span>
+                <span className="block text-xs text-slate-500">
+                  When off, confirming a follow no longer grants anything.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-center gap-3 mt-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={social.requireInstagram !== false}
+                disabled={!social.enabled}
+                onChange={(e) => setSocial((p) => ({ ...p, requireInstagram: e.target.checked }))}
+              />
+              <span className="text-sm text-slate-300">Must follow on Instagram</span>
+            </label>
+            <label className="flex items-center gap-3 mt-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={social.requireWhatsapp !== false}
+                disabled={!social.enabled}
+                onChange={(e) => setSocial((p) => ({ ...p, requireWhatsapp: e.target.checked }))}
+              />
+              <span className="text-sm text-slate-300">Must save our number</span>
+            </label>
+          </div>
+        </div>
       </div>
     </>
   );
