@@ -11,10 +11,37 @@ const MAX_VIDEOS = 2;
 const MAX_PHOTOS = 6;
 
 /** Mirrors the reasons the review queue offers. */
+/**
+ * Short forms of the review reasons, for showing what a rejection was for.
+ * The queue gets the full wording from the server; here they only have to be
+ * recognisable at a glance beside a thumbnail.
+ */
 const REJECTION_LABEL = {
+  unclear_video: 'Unclear video',
+  unclear_audio: 'Unclear audio',
+  instructions_not_followed: 'Instructions not followed',
+  incomplete_information: 'Incomplete information',
+  duration: 'Wrong duration',
+  off_guidelines: 'Off guidelines',
+  face_not_visible: 'Face not visible',
+  children_visible: "Child's face visible",
+  duplicate: 'Duplicate',
+  vulgar: 'Vulgar content',
+  spam: 'Spam',
+  low_quality: 'Low quality',
+  video_error: 'Error in video',
+  other: 'Other reason',
+  // Kept so anything rejected before the list was expanded still reads.
   bad_quality: 'Bad quality',
   misconduct: 'Misconduct',
-  other: 'Other reason',
+};
+
+/** Every reason a rejection carries, newest field first. */
+const rejectionLabels = (item) => {
+  const list = item.rejectionReasons?.length
+    ? item.rejectionReasons
+    : [item.rejectionReason].filter(Boolean);
+  return list.map((r) => REJECTION_LABEL[r] || r);
 };
 
 /**
@@ -54,9 +81,9 @@ function Controls({ item, onApprove, onFeature, onRemove, full }) {
           ? (
             <span
               className="text-xs text-red-400 shrink-0"
-              title={item.rejectionDetail || REJECTION_LABEL[item.rejectionReason] || 'Rejected'}
+              title={[...rejectionLabels(item), item.rejectionDetail].filter(Boolean).join(' · ')}
             >
-              Rejected
+              Not passed
             </span>
           )
           : approved
@@ -66,8 +93,9 @@ function Controls({ item, onApprove, onFeature, onRemove, full }) {
 
       {item.rejectedAt && (
         <p className="text-[10px] text-red-400/70 mt-1 px-1">
-          {item.rejectionDetail || REJECTION_LABEL[item.rejectionReason] || 'Turned down'}
-          {' — she was told.'}
+          {rejectionLabels(item).join(' · ') || 'Turned down'}
+          {item.rejectionDetail ? ` — ${item.rejectionDetail}` : ''}
+          {' (she was told)'}
         </p>
       )}
 
