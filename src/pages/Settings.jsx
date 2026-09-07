@@ -124,6 +124,9 @@ export default function Settings({ admin }) {
   const [savingVoice, setSavingVoice] = useState(false);
   const [testing, setTesting] = useState(false);
   const [emailTest, setEmailTest] = useState(null);
+  const [backingUp, setBackingUp] = useState(false);
+  const [backupTo, setBackupTo] = useState('');
+  const [backupResult, setBackupResult] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -155,6 +158,19 @@ export default function Settings({ admin }) {
 
   // Surface the provider's own error rather than a generic failure, since a
   // rejected send blocks every signup and the reason matters.
+  const sendBackup = async () => {
+    setBackingUp(true);
+    setBackupResult(null);
+    try {
+      const body = backupTo.trim() ? { to: backupTo.trim() } : {};
+      setBackupResult(await api('/backup/send', { method: 'POST', body }));
+    } catch (err) {
+      setBackupResult({ ok: false, error: err.message });
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
   const testEmail = async () => {
     setTesting(true);
     setEmailTest(null);
@@ -378,6 +394,46 @@ export default function Settings({ admin }) {
               {(emailTest.hint || emailTest.note) && (
                 <p className="mt-1 opacity-80">{emailTest.hint || emailTest.note}</p>
               )}
+            </div>
+          )}
+        </Panel>
+
+        {/* The nightly export. A backup nobody has ever seen arrive is not a
+            backup, so this sends one now and reports exactly what went. */}
+        <Panel title="Daily Backup">
+          <p className="text-sm text-slate-300">
+            A spreadsheet of every family, nanny, booking, payment and note is emailed
+            each evening.
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            Set BACKUP_EMAIL on the server to change the recipient, BACKUP_HOUR to change
+            the time.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            <input
+              className="input text-xs w-56"
+              placeholder="Send a copy to… (optional)"
+              value={backupTo}
+              onChange={(e) => setBackupTo(e.target.value)}
+            />
+            <button className="btn-ghost text-xs" onClick={sendBackup} disabled={backingUp}>
+              {backingUp ? 'Building…' : 'Send backup now'}
+            </button>
+          </div>
+
+          {backupResult && (
+            <div className={`mt-3 text-xs rounded-lg p-3 border ${
+              backupResult.ok
+                ? 'bg-emerald-950/30 border-emerald-900 text-emerald-300'
+                : 'bg-red-950/30 border-red-900 text-red-300'
+            }`}>
+              <p className="font-medium">
+                {backupResult.ok
+                  ? `Sent ${backupResult.filename} to ${backupResult.to}`
+                  : `Failed: ${backupResult.error}`}
+              </p>
+              {backupResult.counts && <p className="mt-1 opacity-80">{backupResult.counts}</p>}
             </div>
           )}
         </Panel>
