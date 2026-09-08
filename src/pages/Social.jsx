@@ -249,7 +249,7 @@ export default function Social() {
         ))}
 
         <input
-          className="input text-xs ml-auto w-56"
+          className="input text-xs w-full sm:w-56 sm:ml-auto"
           placeholder="Name, phone or handle…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}

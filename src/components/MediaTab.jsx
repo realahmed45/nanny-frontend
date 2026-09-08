@@ -10,7 +10,6 @@ import { useToast, date } from './ui.jsx';
 const MAX_VIDEOS = 2;
 const MAX_PHOTOS = 6;
 
-/** Mirrors the reasons the review queue offers. */
 /**
  * Short forms of the review reasons, for showing what a rejection was for.
  * The queue gets the full wording from the server; here they only have to be
@@ -118,12 +117,33 @@ function Controls({ item, onApprove, onFeature, onRemove, full }) {
         />
         Show on profile
       </label>
+      {/* Says why the box is unavailable, rather than leaving a dead
+          checkbox with no explanation. */}
+      <p className="text-[10px] leading-tight text-slate-600 mt-1 px-1">
+        {!approved
+          ? 'Approve it first — only approved items can be shown.'
+          : (full && !featured)
+            ? 'Profile is full for this kind. Untick another to make room.'
+            : featured
+              ? 'Families can see this on her profile.'
+              : 'Tick to put this on her public profile.'}
+      </p>
 
       <div className="flex gap-2 mt-2 px-1">
-        <button className="btn-ghost text-xs" onClick={() => onApprove(!approved)}>
+        <button
+          className="btn-ghost text-xs"
+          title={approved
+            ? 'Mark it unchecked. This also takes it off her profile.'
+            : 'Mark it as checked and safe. It still will not show to families until ticked above.'}
+          onClick={() => onApprove(!approved)}
+        >
           {approved ? 'Un-approve' : 'Approve'}
         </button>
-        <button className="btn-ghost text-xs text-red-400" onClick={onRemove}>
+        <button
+          className="btn-ghost text-xs text-red-400"
+          title="Remove it from her records permanently."
+          onClick={onRemove}
+        >
           Delete
         </button>
       </div>

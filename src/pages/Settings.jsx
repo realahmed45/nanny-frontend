@@ -245,7 +245,7 @@ export default function Settings({ admin }) {
         </Panel>
 
         <Panel title="Business Rules">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Currency">Rupiah (Rp)</Field>
             <Field label="Transport Fee">
               {s.transportFee
@@ -265,7 +265,7 @@ export default function Settings({ admin }) {
 
         <Panel title="Bank Details (shown to families)">
           {s.bankConfigured ? (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Bank">{s.bank?.name}</Field>
               <Field label="Account name">{s.bank?.accountName}</Field>
               <Field label="Account number">
@@ -412,7 +412,7 @@ export default function Settings({ admin }) {
 
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <input
-              className="input text-xs w-56"
+              className="input text-xs w-full sm:w-56"
               placeholder="Send a copy to… (optional)"
               value={backupTo}
               onChange={(e) => setBackupTo(e.target.value)}
@@ -439,7 +439,7 @@ export default function Settings({ admin }) {
         </Panel>
 
         <Panel title="Admin Account">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Name">{admin?.name || '—'}</Field>
             <Field label="Email"><span className="font-mono text-xs">{admin?.email}</span></Field>
             <Field label="Role"><Badge value={admin?.role} /></Field>

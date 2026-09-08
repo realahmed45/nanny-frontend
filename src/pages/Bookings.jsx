@@ -344,7 +344,7 @@ function BookingDetail({ booking, extra, refund }) {
           <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
             Refund preview (if cancelled now)
           </p>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
             <div><span className="text-slate-500">Refund</span><p className="font-mono">{money(refund.refund)}</p></div>
             <div><span className="text-slate-500">Penalty</span><p className="font-mono">{money(refund.penalty)}</p></div>
             <div><span className="text-slate-500">Band</span><p className="text-xs">{refund.band || '—'}</p></div>

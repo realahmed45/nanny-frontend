@@ -31,6 +31,7 @@ import {
 function RejectDialog({ kind, reasons, onCancel, onConfirm, busy }) {
   const [picked, setPicked] = useState([]);
   const [note, setNote] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   const toggle = (value) => setPicked((p) => (
     p.includes(value) ? p.filter((v) => v !== value) : [...p, value]
@@ -40,69 +41,131 @@ function RejectDialog({ kind, reasons, onCancel, onConfirm, busy }) {
   const needsNote = picked.includes('other');
   const ready = picked.length > 0 && (!needsNote || note.trim());
 
+  // Built here from the same wording the server sends, so what a reviewer
+  // reads before pressing send is what the nanny actually receives.
+  const told = picked
+    .map((v) => reasons.find((r) => r.value === v)?.told)
+    .filter(Boolean);
+
+  const preview = (() => {
+    const lines = [`\u{1F4F7} About the ${kind} you sent`, ''];
+    if (told.length === 1) {
+      lines.push(`We could not add it to your profile because ${told[0]}.`);
+    } else if (told.length > 1) {
+      lines.push('We could not add it to your profile for these reasons:', '');
+      told.forEach((t) => lines.push(`\u2022 ${t.charAt(0).toUpperCase()}${t.slice(1)}`));
+    } else {
+      lines.push('We could not add it to your profile.');
+    }
+    if (note.trim()) lines.push('', `\u{1F4DD} ${note.trim()}`);
+    lines.push(
+      '',
+      `Please send another when you can \u2014 a ${kind} of you with a family or at work helps you get chosen more often.`,
+    );
+    return lines.join('\n');
+  })();
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4"
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl border border-ink-800 bg-ink-950 p-5"
+        className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-xl border border-ink-800 bg-ink-950 p-4 sm:p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold text-white">Move to Video Not Passed</h3>
-        <p className="text-xs text-slate-500 mt-1 mb-4">
-          The reasons you tick and the note you write are recorded against this {kind} and
-          sent to her on WhatsApp, so she knows what to fix.
-        </p>
+        {/* Step two: the actual words, so a misclick is caught before it
+            reaches her. A rejection cannot be unsent, which is the whole
+            reason this step exists. */}
+        {confirming ? (
+          <>
+            <h3 className="text-lg font-semibold text-white">Send this to her?</h3>
+            <p className="text-xs text-slate-500 mt-1 mb-4">
+              This is exactly what she will receive on WhatsApp. It cannot be unsent.
+            </p>
 
-        <p className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">Reason</p>
-        <div className="space-y-1.5">
-          {reasons.map((r) => (
-            <label
-              key={r.value}
-              className="flex items-start gap-2.5 cursor-pointer rounded px-2 py-1.5 hover:bg-ink-900/60"
-            >
-              <input
-                type="checkbox"
-                className="mt-0.5 accent-red-500"
-                checked={picked.includes(r.value)}
-                onChange={() => toggle(r.value)}
-              />
-              <span className="text-sm text-slate-200">{r.label}</span>
+            <pre className="whitespace-pre-wrap break-words rounded-lg border border-ink-800 bg-ink-900/60 p-3 text-sm text-slate-200 font-sans">
+              {preview}
+            </pre>
+
+            <div className="flex flex-wrap items-center gap-2 mt-5">
+              <button
+                className="btn-primary text-sm disabled:opacity-40"
+                disabled={busy}
+                onClick={() => onConfirm(picked, note.trim())}
+              >
+                {busy ? 'Sending\u2026' : 'Yes, send it'}
+              </button>
+              <button
+                className="btn-ghost text-sm"
+                onClick={() => setConfirming(false)}
+                disabled={busy}
+              >
+                Back
+              </button>
+              <button className="btn-ghost text-sm" onClick={onCancel} disabled={busy}>
+                Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-semibold text-white">Move to Video Not Passed</h3>
+            <p className="text-xs text-slate-500 mt-1 mb-4">
+              The reasons you tick and the note you write are recorded against this {kind} and
+              sent to her on WhatsApp, so she knows what to fix.
+            </p>
+
+            <p className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">Reason</p>
+            <div className="space-y-1.5">
+              {reasons.map((r) => (
+                <label
+                  key={r.value}
+                  className="flex items-start gap-2.5 cursor-pointer rounded px-2 py-1.5 hover:bg-ink-900/60"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 accent-red-500"
+                    checked={picked.includes(r.value)}
+                    onChange={() => toggle(r.value)}
+                  />
+                  <span className="text-sm text-slate-200">{r.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <label className="block text-xs font-mono uppercase tracking-wider text-slate-500 mt-4 mb-2">
+              Note {needsNote
+                ? <span className="text-red-400 normal-case font-sans">(required for &ldquo;Other reason&rdquo;)</span>
+                : <span className="text-slate-600 normal-case font-sans">(optional)</span>}
             </label>
-          ))}
-        </div>
+            <textarea
+              rows={3}
+              className="input text-sm w-full"
+              placeholder="Anything else she should know. She reads this."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
 
-        <label className="block text-xs font-mono uppercase tracking-wider text-slate-500 mt-4 mb-2">
-          Note {needsNote
-            ? <span className="text-red-400 normal-case font-sans">(required for “Other reason”)</span>
-            : <span className="text-slate-600 normal-case font-sans">(optional)</span>}
-        </label>
-        <textarea
-          rows={3}
-          className="input text-sm w-full"
-          placeholder="Anything else she should know. She reads this."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-
-        <div className="flex items-center gap-2 mt-5">
-          <button
-            className="btn-primary text-sm disabled:opacity-40"
-            disabled={!ready || busy}
-            onClick={() => onConfirm(picked, note.trim())}
-          >
-            {busy ? 'Sending…' : 'Move to Video Not Passed'}
-          </button>
-          <button className="btn-ghost text-sm" onClick={onCancel} disabled={busy}>
-            Cancel
-          </button>
-          {picked.length > 0 && (
-            <span className="ml-auto text-xs text-slate-600">
-              {picked.length} reason{picked.length === 1 ? '' : 's'} selected
-            </span>
-          )}
-        </div>
+            <div className="flex flex-wrap items-center gap-2 mt-5">
+              <button
+                className="btn-primary text-sm disabled:opacity-40"
+                disabled={!ready || busy}
+                onClick={() => setConfirming(true)}
+              >
+                Review message
+              </button>
+              <button className="btn-ghost text-sm" onClick={onCancel} disabled={busy}>
+                Cancel
+              </button>
+              {picked.length > 0 && (
+                <span className="ml-auto text-xs text-slate-600">
+                  {picked.length} reason{picked.length === 1 ? '' : 's'} selected
+                </span>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -119,7 +182,7 @@ function MediaCard({ item, kind, full, reasons, onApprove, onReject }) {
   };
 
   return (
-    <div className="w-52 shrink-0 rounded-lg border border-ink-800 bg-ink-950/60 p-2">
+    <div className="w-full sm:w-52 sm:shrink-0 rounded-lg border border-ink-800 bg-ink-950/60 p-2">
       {kind === 'video' ? (
         <video
           src={item.url}
@@ -153,33 +216,52 @@ function MediaCard({ item, kind, full, reasons, onApprove, onReject }) {
         />
       )}
 
-      <div className="mt-2 space-y-1.5">
-        {/* Approving and featuring in one action, because at the moment of
-            judging it the reviewer already knows whether it is good enough to
-            show. Disabled — not hidden — when the profile is full, so the
-            reason is visible. */}
-        <button
-          className="btn-ghost text-xs w-full"
-          disabled={busy}
-          onClick={() => run(() => onApprove(false))}
-        >
-          Approve
-        </button>
-        <button
-          className="btn-ghost text-xs w-full text-emerald-400 disabled:opacity-40"
-          disabled={busy || full}
-          title={full ? 'Her profile is already full for this kind' : 'Approve and show it on her profile'}
-          onClick={() => run(() => onApprove(true))}
-        >
-          Approve + show on profile
-        </button>
-        <button
-          className="btn-ghost text-xs w-full text-red-400"
-          disabled={busy}
-          onClick={() => setRejecting(true)}
-        >
-          Not passed
-        </button>
+      <div className="mt-2 space-y-2">
+        {/* Approving and showing are two different decisions, and the
+            difference is not self-evident — someone will approve fifty items
+            believing they are publishing them. So each button says what it
+            actually does, rather than leaving it to be discovered. */}
+        <div>
+          <button
+            className="btn-ghost text-xs w-full"
+            disabled={busy}
+            onClick={() => run(() => onApprove(false))}
+          >
+            Approve only
+          </button>
+          <p className="text-[10px] leading-tight text-slate-600 mt-1 px-0.5">
+            Marks it as checked and safe. Families still will not see it.
+          </p>
+        </div>
+
+        <div>
+          <button
+            className="btn-ghost text-xs w-full text-emerald-400 disabled:opacity-40"
+            disabled={busy || full}
+            onClick={() => run(() => onApprove(true))}
+          >
+            Approve + show on profile
+          </button>
+          <p className="text-[10px] leading-tight text-slate-600 mt-1 px-0.5">
+            {full
+              ? 'Her profile is already full for this kind — untick another first.'
+              : 'Checks it and puts it on her public profile for families to see.'}
+          </p>
+        </div>
+
+        <div>
+          <button
+            className="btn-ghost text-xs w-full text-red-400"
+            disabled={busy}
+            onClick={() => setRejecting(true)}
+          >
+            Not passed
+          </button>
+          <p className="text-[10px] leading-tight text-slate-600 mt-1 px-0.5">
+            Turns it down and sends her the reason on WhatsApp. You will see the
+            message before it goes.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -191,10 +273,13 @@ function NannyRow({ nanny, limits, reasons, onAction }) {
 
   return (
     <div className="rounded-xl border border-ink-800 bg-ink-950/40 p-4">
-      <div className="flex gap-5">
+      {/* Side by side on a desktop, stacked on a phone: a 224px details
+          column beside a media strip leaves the media a useless sliver on a
+          375px screen. */}
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
         {/* Who sent it — kept beside the media, because the judgement is
             about her, not just the file. */}
-        <div className="w-56 shrink-0">
+        <div className="w-full sm:w-56 sm:shrink-0">
           <div className="flex items-start gap-3">
             <Avatar name={nanny.fullName} />
             <div className="min-w-0">
@@ -229,7 +314,7 @@ function NannyRow({ nanny, limits, reasons, onAction }) {
         {/* What she sent. Scrolls sideways rather than wrapping, so a nanny
             with twenty photos stays one row. */}
         <div className="min-w-0 flex-1 overflow-x-auto">
-          <div className="flex gap-3 pb-1">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:gap-3 sm:pb-1">
             {nanny.videos.map((v) => (
               <MediaCard
                 key={v._id}
