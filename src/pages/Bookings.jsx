@@ -72,6 +72,8 @@ export default function Bookings() {
     api(`/bookings/${b._id}/refund-preview`).then(setRefund).catch(() => {});
   };
 
+  const [broadcasting, setBroadcasting] = useState(false);
+
   const cancel = async () => {
     if (!window.confirm('Cancel this booking and apply the refund policy?')) return;
     try {
@@ -84,6 +86,34 @@ export default function Bookings() {
       load();
     } catch (e) {
       toastError(e.message);
+    }
+  };
+
+  /**
+   * Offer an emergency to every available nanny at once.
+   *
+   * Confirmed first, and with the count in the question, because this sends a
+   * WhatsApp to potentially dozens of people and cannot be recalled.
+   */
+  const broadcast = async () => {
+    if (!window.confirm(
+      'Send this urgent job to every available nanny?\n\n'
+      + 'They will all get a WhatsApp now. The first to reply YES gets it, '
+      + 'and the rest are told it has gone.',
+    )) return;
+
+    setBroadcasting(true);
+    try {
+      const r = await api(`/bookings/${selected._id}/broadcast-emergency`, { method: 'POST' });
+      notify(r.sent
+        ? `Sent to ${r.sent} nann${r.sent === 1 ? 'y' : 'ies'}. First to accept gets it.`
+        : `Nobody is available right now${r.reason ? ` — ${r.reason}` : ''}.`);
+      const fresh = await api(`/bookings/${selected._id}`);
+      setDetail(fresh);
+    } catch (e) {
+      toastError(e.message);
+    } finally {
+      setBroadcasting(false);
     }
   };
 
@@ -199,7 +229,17 @@ export default function Bookings() {
         wide
         footer={
           selected && !['cancelled', 'completed'].includes(selected.status) ? (
-            <button className="btn-danger" onClick={cancel}>Cancel booking</button>
+            <div className="flex flex-wrap items-center gap-2 w-full">
+              {/* Only for an emergency, and only while nobody has taken it —
+                  a broadcast for a job already claimed would send dozens of
+                  people to a booking that no longer exists. */}
+              {selected.isEmergency && !(detail?.booking || selected).emergencyBroadcast?.claimedBy && (
+                <button className="btn-primary" onClick={broadcast} disabled={broadcasting}>
+                  {broadcasting ? 'Sending…' : '🚨 Send to all available nannies'}
+                </button>
+              )}
+              <button className="btn-danger sm:ml-auto" onClick={cancel}>Cancel booking</button>
+            </div>
           ) : null
         }
       >

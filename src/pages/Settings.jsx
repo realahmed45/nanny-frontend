@@ -127,11 +127,16 @@ export default function Settings({ admin }) {
   const [backingUp, setBackingUp] = useState(false);
   const [backupTo, setBackupTo] = useState('');
   const [backupResult, setBackupResult] = useState(null);
+  const [accounts, setAccounts] = useState({ instagram: '', facebook: '', tiktok: '' });
+  const [savingAccounts, setSavingAccounts] = useState(false);
 
   const load = () => {
     setLoading(true);
     api('/settings')
-      .then(setSettings)
+      .then((data) => {
+        setSettings(data);
+        setAccounts({ instagram: '', facebook: '', tiktok: '', ...(data.accounts || {}) });
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -156,8 +161,18 @@ export default function Settings({ admin }) {
     }
   };
 
-  // Surface the provider's own error rather than a generic failure, since a
-  // rejected send blocks every signup and the reason matters.
+  const saveAccounts = async () => {
+    setSavingAccounts(true);
+    try {
+      await api('/settings', { method: 'PATCH', body: { accounts } });
+      notify('Social accounts saved.');
+    } catch (err) {
+      toastError(err.message);
+    } finally {
+      setSavingAccounts(false);
+    }
+  };
+
   const sendBackup = async () => {
     setBackingUp(true);
     setBackupResult(null);
@@ -171,6 +186,8 @@ export default function Settings({ admin }) {
     }
   };
 
+  // Surface the provider's own error rather than a generic failure, since a
+  // rejected send blocks every signup and the reason matters.
   const testEmail = async () => {
     setTesting(true);
     setEmailTest(null);
@@ -400,6 +417,51 @@ export default function Settings({ admin }) {
 
         {/* The nightly export. A backup nobody has ever seen arrive is not a
             backup, so this sends one now and reports exactly what went. */}
+        {/* Our own accounts, as opposed to a customer's — those live on the
+            Follow & Save page. Stored as bare handles so they can be shown as
+            a link or as "@name" without being pulled apart again. */}
+        <Panel title="Our Social Accounts">
+          <p className="text-sm text-slate-400 mb-4">
+            The accounts customers are asked to follow. Used by the
+            Follow &amp; Save discount and shown wherever we link to ourselves.
+          </p>
+
+          <div className="space-y-3">
+            {[
+              { key: 'instagram', label: 'Instagram', base: 'instagram.com/' },
+              { key: 'facebook', label: 'Facebook', base: 'facebook.com/' },
+              { key: 'tiktok', label: 'TikTok', base: 'tiktok.com/@' },
+            ].map(({ key, label, base }) => (
+              <div key={key}>
+                <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-600 font-mono shrink-0 hidden sm:inline">{base}</span>
+                  <input
+                    className="input text-sm flex-1 min-w-0"
+                    placeholder="account name"
+                    value={accounts[key] || ''}
+                    onChange={(e) => setAccounts((a) => ({ ...a, [key]: e.target.value }))}
+                  />
+                  {accounts[key] && (
+                    <a
+                      href={`https://${base}${accounts[key]}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-brand-400 hover:underline shrink-0"
+                    >
+                      open
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button className="btn-primary mt-4 text-xs" onClick={saveAccounts} disabled={savingAccounts}>
+            {savingAccounts ? 'Saving…' : 'Save accounts'}
+          </button>
+        </Panel>
+
         <Panel title="Daily Backup">
           <p className="text-sm text-slate-300">
             A spreadsheet of every family, nanny, booking, payment and note is emailed
