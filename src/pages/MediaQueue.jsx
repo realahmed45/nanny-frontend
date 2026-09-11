@@ -181,8 +181,20 @@ function MediaCard({ item, kind, full, reasons, onApprove, onReject }) {
     try { await fn(); } finally { setBusy(false); }
   };
 
+  // A face photo is judged on different grounds from a photo at work — is
+  // this how she should appear beside her name — so it is marked out of the
+  // strip rather than blending into it.
+  const isFace = kind === 'profile picture';
+
   return (
-    <div className="w-full sm:w-52 sm:shrink-0 rounded-lg border border-ink-800 bg-ink-950/60 p-2">
+    <div className={`w-full sm:w-52 sm:shrink-0 rounded-lg border p-2 ${
+      isFace
+        ? 'border-fuchsia-500/40 bg-fuchsia-500/[0.06]'
+        : 'border-ink-800 bg-ink-950/60'
+    }`}>
+      {isFace && (
+        <p className="mb-1.5 text-[10px] font-medium text-fuchsia-300">🙂 Photo of the face</p>
+      )}
       {kind === 'video' ? (
         <video
           src={item.url}

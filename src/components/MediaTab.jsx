@@ -197,6 +197,12 @@ export default function MediaTab({ nanny, onChanged }) {
   const photos = nanny?.photos || [];
   const pictures = nanny?.profilePictures || [];
 
+  // Three kinds that get judged differently, so they get their own screens
+  // rather than one long scroll. Face photos default last in the list but are
+  // deliberately loud: they are the only ones where picking a new item
+  // replaces an old one, and that rule is easy to miss in a uniform grid.
+  const [section, setSection] = useState('videos');
+
   /** Every change refetches, so the tab always shows what the server holds. */
   const run = async (fn, message) => {
     try {
@@ -277,11 +283,45 @@ export default function MediaTab({ nanny, onChanged }) {
       <p className="text-xs text-slate-500 rounded-lg border border-ink-800 bg-ink-950/40 px-3 py-2">
         Approving means the item has been checked — it does <span className="text-slate-300">not</span> put it
         on her profile. Only items with <span className="text-slate-300">Show on profile</span> ticked are
-        visible to families: up to {MAX_VIDEOS} videos and {MAX_PHOTOS} photos. Everything else stays in
-        her records.
+        visible to families: up to {MAX_VIDEOS} videos, {MAX_PHOTOS} photos, and one face photo.
+        Everything else stays in her records.
       </p>
 
-      <section>
+      {/* Deliberately not the shared Tabs component: the face tab needs to look
+          different from its neighbours, and a shared control that takes a
+          per-tab colour would be a worse abstraction than three buttons. */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: 'videos', label: 'Videos', count: videos.length },
+          { key: 'photos', label: 'Photos at work', count: photos.length },
+          { key: 'faces', label: '🙂 Photos of the face', count: pictures.length },
+        ].map((t) => {
+          const active = section === t.key;
+          const face = t.key === 'faces';
+          return (
+            <button
+              key={t.key}
+              onClick={() => setSection(t.key)}
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                face
+                  ? active
+                    ? 'bg-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/30'
+                    : 'bg-fuchsia-500/15 text-fuchsia-300 hover:bg-fuchsia-500/25 ring-1 ring-fuchsia-500/40'
+                  : active
+                    ? 'bg-brand-500/20 text-brand-300 ring-1 ring-brand-500/40'
+                    : 'bg-ink-800 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t.label}
+              <span className={`ml-2 ${face && active ? 'text-white/70' : 'text-slate-500'}`}>
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <section hidden={section !== 'videos'}>
         <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">
           Videos
           <span className="ml-2 text-slate-600">{videos.length}</span>
@@ -322,19 +362,30 @@ export default function MediaTab({ nanny, onChanged }) {
 
       {/* Her headshots. Kept apart from the photos of her at work because they
           answer a different question — what she looks like, rather than what
-          she is like — and because only one of them can be in use. */}
-      <section>
-        <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">
-          Profile pictures
-          <span className="ml-2 text-slate-600">{pictures.length}</span>
-          <span className="ml-2 normal-case text-slate-600">
+          she is like — and because only one of them can be in use. The colour
+          carries that difference: everything here behaves like a choice, not
+          like a collection. */}
+      <section
+        hidden={section !== 'faces'}
+        className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/[0.04] p-4"
+      >
+        <h4 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fuchsia-300 mb-1">
+          🙂 Photos of the face
+          <span className="rounded-full bg-fuchsia-500/20 px-2 py-0.5 text-[11px] font-normal text-fuchsia-200">
+            {pictures.length} stored
+          </span>
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-normal ${
+            shownPictures
+              ? 'bg-emerald-500/20 text-emerald-300'
+              : 'bg-amber-500/20 text-amber-300'
+          }`}>
             {shownPictures ? '1 in use' : 'none in use'}
           </span>
         </h4>
 
-        <p className="text-[11px] text-slate-600 mb-3">
-          Only one can be in use at a time — it is the picture families see beside her
-          name. Choosing another replaces it.
+        <p className="text-xs text-fuchsia-200/70 mb-4">
+          This is the picture families see beside her name. Only one can be in use at a
+          time — choosing another replaces it.
         </p>
 
         <AddForm kind="picture" onAdd={(url, label) => add('profile-picture', url, label)} />
@@ -350,7 +401,7 @@ export default function MediaTab({ nanny, onChanged }) {
                 key={p._id || p.url}
                 className={`rounded-lg border bg-ink-950/60 p-2 ${
                   p.approved && p.featured
-                    ? 'border-emerald-500/60 ring-1 ring-emerald-500/30'
+                    ? 'border-fuchsia-400 ring-2 ring-fuchsia-400/40'
                     : 'border-ink-800'
                 }`}
               >
@@ -377,9 +428,9 @@ export default function MediaTab({ nanny, onChanged }) {
         )}
       </section>
 
-      <section>
+      <section hidden={section !== 'photos'}>
         <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">
-          Photos
+          Photos at work
           <span className="ml-2 text-slate-600">{photos.length}</span>
           <span className={`ml-2 normal-case ${shownPhotos >= MAX_PHOTOS ? 'text-amber-400' : 'text-slate-600'}`}>
             {shownPhotos}/{MAX_PHOTOS} on profile

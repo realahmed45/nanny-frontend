@@ -290,7 +290,7 @@ export default function Nannies() {
               tabs={[
                 { value: 'profile', label: 'Profile' },
                 { value: 'calendar', label: 'Calendar' },
-                { value: 'media', label: 'Nanny videos' },
+                { value: 'media', label: 'Nanny videos and pictures' },
                 { value: 'referrals', label: 'Customers/families they referred' },
                 { value: 'referred-nannies', label: 'Nannies they referred' },
               ]}
@@ -393,14 +393,14 @@ function NannyDetail({ nanny, extra, onBooking }) {
       )}
 
       {/* Her introduction video. Families only see it once it is approved. */}
-      {/* Her videos and photos live in the Nanny videos tab, where a backlog
+      {/* Her videos and photos live in the Nanny videos and pictures tab, where a backlog
           can be reviewed without scrolling past the rest of her record. */}
       {(nanny.videos?.length > 0 || nanny.photos?.length > 0) && (
         <p className="text-xs text-slate-500">
           {nanny.videos?.length || 0} video{nanny.videos?.length === 1 ? '' : 's'}
           {' and '}
           {nanny.photos?.length || 0} photo{nanny.photos?.length === 1 ? '' : 's'}
-          {' — see the '}<span className="text-slate-300">Nanny videos</span> tab.
+          {' — see the '}<span className="text-slate-300">Nanny videos and pictures</span> tab.
         </p>
       )}
 
