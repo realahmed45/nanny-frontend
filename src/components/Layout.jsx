@@ -17,6 +17,7 @@ const NAV = [
   { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
   { to: '/payments', label: 'Payments', Icon: IconPayments, count: 'payments' },
   { to: '/pricing', label: 'Pricing', Icon: IconPayments },
+  { to: '/areas', label: 'Areas', Icon: IconCalendar },
   { to: '/support', label: 'Support Tickets', Icon: IconSupport, count: 'tickets' },
   { to: '/referrals', label: 'Referrals', Icon: IconReferrals },
   { to: '/referral-engine', label: 'Referral Engine', Icon: IconReferrals },

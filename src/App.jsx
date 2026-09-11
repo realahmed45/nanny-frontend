@@ -12,6 +12,7 @@ import Support from './pages/Support.jsx';
 import Chats from './pages/Chats.jsx';
 import NotesPage from './pages/Notes.jsx';
 import Social from './pages/Social.jsx';
+import Areas from './pages/Areas.jsx';
 import MediaQueue from './pages/MediaQueue.jsx';
 import Settings from './pages/Settings.jsx';
 import Pricing from './pages/Pricing.jsx';
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="chats" element={<Chats />} />
           <Route path="notes" element={<NotesPage />} />
           <Route path="social" element={<Social />} />
+          <Route path="areas" element={<Areas />} />
           <Route path="media-queue" element={<MediaQueue />} />
           <Route path="settings" element={<Settings admin={admin} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
