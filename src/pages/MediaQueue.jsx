@@ -269,7 +269,8 @@ function MediaCard({ item, kind, full, reasons, onApprove, onReject }) {
 
 /** One nanny: her details on the left, everything she sent on the right. */
 function NannyRow({ nanny, limits, reasons, onAction }) {
-  const waiting = nanny.videos.length + nanny.photos.length;
+  const waiting = nanny.videos.length + nanny.photos.length
+    + (nanny.profilePictures?.length || 0);
 
   return (
     <div className="rounded-xl border border-ink-800 bg-ink-950/40 p-4">
@@ -304,6 +305,7 @@ function NannyRow({ nanny, limits, reasons, onAction }) {
           <p className="mt-3 text-[11px] text-slate-600">
             On profile: {nanny.featuredVideos}/{limits.videos} videos,{' '}
             {nanny.featuredPhotos}/{limits.photos} photos
+            {nanny.featuredProfilePictures ? ' · picture set' : ''}
           </p>
 
           <p className="mt-2 text-[11px] text-amber-400">
@@ -335,6 +337,20 @@ function NannyRow({ nanny, limits, reasons, onAction }) {
                 full={nanny.featuredPhotos >= limits.photos}
                 onApprove={(feature) => onAction.approve(nanny, 'photos', p, feature)}
                 onReject={(reason, detail) => onAction.reject(nanny, 'photos', p, reason, detail)}
+              />
+            ))}
+            {/* `full` is never true for a headshot: only one can be in use,
+                and choosing a new one replaces the old rather than being
+                refused for lack of room. */}
+            {(nanny.profilePictures || []).map((p) => (
+              <MediaCard
+                key={p._id}
+                item={p}
+                kind="profile picture"
+                reasons={reasons}
+                full={false}
+                onApprove={(feature) => onAction.approve(nanny, 'profile-pictures', p, feature)}
+                onReject={(reason, detail) => onAction.reject(nanny, 'profile-pictures', p, reason, detail)}
               />
             ))}
           </div>

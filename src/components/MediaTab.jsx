@@ -195,6 +195,7 @@ export default function MediaTab({ nanny, onChanged }) {
   const { toast, notify, error: toastError } = useToast();
   const videos = nanny?.videos || [];
   const photos = nanny?.photos || [];
+  const pictures = nanny?.profilePictures || [];
 
   /** Every change refetches, so the tab always shows what the server holds. */
   const run = async (fn, message) => {
@@ -207,10 +208,26 @@ export default function MediaTab({ nanny, onChanged }) {
     }
   };
 
-  const noun = (kind) => (kind === 'video' ? 'Video' : 'Photo');
+  // Each kind has its own endpoint and its own word for itself, kept in one
+  // place so a new section is a row here rather than string-building at every
+  // call site.
+  const KIND = {
+    video: { path: 'videos', noun: 'Video' },
+    photo: { path: 'photos', noun: 'Photo' },
+    'profile-picture': { path: 'profile-pictures', noun: 'Profile picture' },
+  };
+  const noun = (kind) => KIND[kind].noun;
+  const path = (kind) => KIND[kind].path;
+
+  // "Show on profile" means something slightly different for a headshot: it is
+  // the one picture beside her name, so choosing it replaces the previous one
+  // rather than adding to a set.
+  const shownVerb = (kind) => (kind === 'profile-picture'
+    ? 'is now her profile picture.'
+    : 'is now on her profile.');
 
   const setApproved = (kind, item, approved) => run(
-    () => api(`/nannies/${nanny._id}/${kind}s/${item._id}`, {
+    () => api(`/nannies/${nanny._id}/${path(kind)}/${item._id}`, {
       method: 'PATCH', body: { approved },
     }),
     approved ? `${noun(kind)} approved. Tick "Show on profile" to display it.`
@@ -218,31 +235,32 @@ export default function MediaTab({ nanny, onChanged }) {
   );
 
   const setFeatured = (kind, item, featured) => run(
-    () => api(`/nannies/${nanny._id}/${kind}s/${item._id}`, {
+    () => api(`/nannies/${nanny._id}/${path(kind)}/${item._id}`, {
       method: 'PATCH', body: { featured },
     }),
-    featured ? `${noun(kind)} is now on her profile.`
+    featured ? `${noun(kind)} ${shownVerb(kind)}`
       : `${noun(kind)} removed from her profile.`,
   );
 
   const remove = (kind, item) => run(
-    () => api(`/nannies/${nanny._id}/${kind}s/${item._id}`, { method: 'DELETE' }),
-    `${kind === 'video' ? 'Video' : 'Photo'} deleted.`,
+    () => api(`/nannies/${nanny._id}/${path(kind)}/${item._id}`, { method: 'DELETE' }),
+    `${noun(kind)} deleted.`,
   );
 
   const add = (kind, url, label) => run(
-    () => api(`/nannies/${nanny._id}/${kind}s`, {
+    () => api(`/nannies/${nanny._id}/${path(kind)}`, {
       method: 'POST',
       body: kind === 'video' ? { url, title: label } : { url, caption: label },
     }),
-    `${kind === 'video' ? 'Video' : 'Photo'} added.`,
+    `${noun(kind)} added.`,
   );
 
-  const waiting = [...videos, ...photos].filter((m) => !m.approved).length;
+  const waiting = [...videos, ...photos, ...pictures].filter((m) => !m.approved).length;
 
   // What is actually on her profile, against what it can hold.
   const shownVideos = videos.filter((v) => v.approved && v.featured).length;
   const shownPhotos = photos.filter((p) => p.approved && p.featured).length;
+  const shownPictures = pictures.filter((p) => p.approved && p.featured).length;
 
   return (
     <div className="space-y-6">
@@ -295,6 +313,63 @@ export default function MediaTab({ nanny, onChanged }) {
                   onApprove={(on) => setApproved('video', v, on)}
                   onFeature={(on) => setFeatured('video', v, on)}
                   onRemove={() => remove('video', v)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Her headshots. Kept apart from the photos of her at work because they
+          answer a different question — what she looks like, rather than what
+          she is like — and because only one of them can be in use. */}
+      <section>
+        <h4 className="text-xs font-mono uppercase tracking-wider text-slate-500 mb-2">
+          Profile pictures
+          <span className="ml-2 text-slate-600">{pictures.length}</span>
+          <span className="ml-2 normal-case text-slate-600">
+            {shownPictures ? '1 in use' : 'none in use'}
+          </span>
+        </h4>
+
+        <p className="text-[11px] text-slate-600 mb-3">
+          Only one can be in use at a time — it is the picture families see beside her
+          name. Choosing another replaces it.
+        </p>
+
+        <AddForm kind="picture" onAdd={(url, label) => add('profile-picture', url, label)} />
+
+        {pictures.length === 0 ? (
+          <p className="text-xs text-slate-600 rounded-lg border border-dashed border-ink-800 px-3 py-4 text-center">
+            She has no profile pictures yet.
+          </p>
+        ) : (
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+            {pictures.map((p) => (
+              <div
+                key={p._id || p.url}
+                className={`rounded-lg border bg-ink-950/60 p-2 ${
+                  p.approved && p.featured
+                    ? 'border-emerald-500/60 ring-1 ring-emerald-500/30'
+                    : 'border-ink-800'
+                }`}
+              >
+                <a href={p.url} target="_blank" rel="noreferrer">
+                  <img
+                    src={p.url}
+                    alt={p.caption || 'Profile picture'}
+                    loading="lazy"
+                    className="w-full h-32 object-cover rounded bg-ink-900"
+                  />
+                </a>
+                {/* `full` stays false: picking a new one is how you swap it,
+                    so the box must never be disabled for being "full". */}
+                <Controls
+                  item={p}
+                  full={false}
+                  onApprove={(on) => setApproved('profile-picture', p, on)}
+                  onFeature={(on) => setFeatured('profile-picture', p, on)}
+                  onRemove={() => remove('profile-picture', p)}
                 />
               </div>
             ))}
