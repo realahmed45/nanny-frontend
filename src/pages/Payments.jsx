@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '../lib/api.js';
+import api, { mediaUrl } from '../lib/api.js';
 import {
   PageHeader, Table, Badge, Tabs, StatCard, Pagination, Modal, Field,
   useToast, ErrorBox, money, date, dateTime, humanize,
@@ -314,9 +314,9 @@ export default function Payments() {
                 <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
                   Transfer receipt
                 </p>
-                <a href={selected.proof.url} target="_blank" rel="noreferrer" className="block">
+                <a href={mediaUrl(selected.proof.url)} target="_blank" rel="noreferrer" className="block">
                   <img
-                    src={selected.proof.url}
+                    src={mediaUrl(selected.proof.url)}
                     alt="Transfer receipt"
                     className="max-h-80 rounded-lg border border-ink-700 bg-ink-950"
                   />
@@ -327,7 +327,7 @@ export default function Payments() {
                   </p>
                 )}
                 <a
-                  href={selected.proof.url}
+                  href={mediaUrl(selected.proof.url)}
                   target="_blank"
                   rel="noreferrer"
                   className="text-xs text-brand-400 hover:text-brand-300 mt-1 inline-block"
@@ -342,9 +342,9 @@ export default function Payments() {
                 <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
                   Refund receipt
                 </p>
-                <a href={selected.refundProof.url} target="_blank" rel="noreferrer">
+                <a href={mediaUrl(selected.refundProof.url)} target="_blank" rel="noreferrer">
                   <img
-                    src={selected.refundProof.url}
+                    src={mediaUrl(selected.refundProof.url)}
                     alt="Refund receipt"
                     className="max-h-64 rounded-lg border border-ink-700"
                   />

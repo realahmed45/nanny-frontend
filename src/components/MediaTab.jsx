@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import api from '../lib/api.js';
+import api, { mediaUrl } from '../lib/api.js';
 import { useToast, date } from './ui.jsx';
 
 /**
@@ -341,7 +341,7 @@ export default function MediaTab({ nanny, onChanged }) {
             {videos.map((v) => (
               <div key={v._id || v.url} className="rounded-lg border border-ink-800 bg-ink-950/60 p-2">
                 <video
-                  src={v.url}
+                  src={mediaUrl(v.url)}
                   poster={v.thumbnailUrl}
                   controls
                   preload="metadata"
@@ -405,9 +405,9 @@ export default function MediaTab({ nanny, onChanged }) {
                     : 'border-ink-800'
                 }`}
               >
-                <a href={p.url} target="_blank" rel="noreferrer">
+                <a href={mediaUrl(p.url)} target="_blank" rel="noreferrer">
                   <img
-                    src={p.url}
+                    src={mediaUrl(p.url)}
                     alt={p.caption || 'Profile picture'}
                     loading="lazy"
                     className="w-full h-32 object-cover rounded bg-ink-900"
@@ -448,9 +448,9 @@ export default function MediaTab({ nanny, onChanged }) {
             {photos.map((p) => (
               <div key={p._id || p.url} className="rounded-lg border border-ink-800 bg-ink-950/60 p-2">
                 {/* Opens full size: a thumbnail is rarely enough to judge one. */}
-                <a href={p.url} target="_blank" rel="noreferrer">
+                <a href={mediaUrl(p.url)} target="_blank" rel="noreferrer">
                   <img
-                    src={p.url}
+                    src={mediaUrl(p.url)}
                     alt={p.caption || 'Nanny photo'}
                     loading="lazy"
                     className="w-full h-32 object-cover rounded bg-ink-900"

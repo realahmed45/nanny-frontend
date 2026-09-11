@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import api from '../lib/api.js';
+import api, { mediaUrl } from '../lib/api.js';
 import Notes from '../components/Notes.jsx';
 import PersonCalendar from '../components/PersonCalendar.jsx';
 import ReferralsTab from '../components/ReferralsTab.jsx';
@@ -469,7 +469,7 @@ function NannyDetail({ nanny, extra, onBooking }) {
             {nanny.documents.map((d, i) => (
               <a
                 key={i}
-                href={d.url}
+                href={mediaUrl(d.url)}
                 target="_blank"
                 rel="noreferrer"
                 className="px-2 py-1 rounded bg-ink-800 text-xs text-brand-400 hover:text-brand-300"

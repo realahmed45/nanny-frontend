@@ -20,6 +20,32 @@ const BASE = String(rawBase)
   .replace(/\/auth\/login$/, '');
 const TOKEN_KEY = 'mynanny_admin_token';
 
+/**
+ * Turn a stored media path into something this page can load.
+ *
+ * Media is stored as "/media/abc.jpg" — a path, so the same record works on
+ * localhost, on Render, and behind any domain put in front later. But the
+ * dashboard is served from somewhere else entirely (Vercel), where that path
+ * resolves to the static host and 404s. The file lives with the API, so the
+ * path has to be resolved against the API's origin rather than the page's.
+ *
+ * Absolute URLs are returned untouched: anything already pointing somewhere
+ * specific was put there deliberately.
+ */
+const API_ORIGIN = (() => {
+  try {
+    return new URL(BASE, window.location.origin).origin;
+  } catch {
+    return window.location.origin;
+  }
+})();
+
+export function mediaUrl(url) {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+  return `${API_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);

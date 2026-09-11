@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../lib/api.js';
+import api, { mediaUrl } from '../lib/api.js';
 import {
   PageHeader, Skeleton, ErrorBox, Avatar, Pagination, dateTime,
 } from '../components/ui.jsx';
@@ -84,7 +84,7 @@ function NoteCard({ note, onOpen }) {
               {note.attachments.map((a) => (
                 <a
                   key={a._id || a.url}
-                  href={a.url}
+                  href={mediaUrl(a.url)}
                   target="_blank"
                   rel="noreferrer"
                   className="text-xs bg-ink-800 hover:bg-ink-700 rounded px-2 py-1 text-slate-300 max-w-[200px] truncate"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '../lib/api.js';
+import api, { mediaUrl } from '../lib/api.js';
 import { dateTime } from './ui.jsx';
 
 /**
@@ -432,7 +432,7 @@ export default function Notes({ targetType, target, initial = [], bookings = [],
                   {n.attachments.map((a) => (
                     <a
                       key={a._id || a.url}
-                      href={a.url}
+                      href={mediaUrl(a.url)}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1.5 text-xs bg-ink-800 hover:bg-ink-700 rounded px-2 py-1 text-slate-300"

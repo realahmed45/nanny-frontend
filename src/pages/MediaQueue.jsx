@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '../lib/api.js';
+import api, { mediaUrl } from '../lib/api.js';
 import {
   PageHeader, Skeleton, ErrorBox, Avatar, useToast, money, date, humanize, Badge,
 } from '../components/ui.jsx';
@@ -197,16 +197,16 @@ function MediaCard({ item, kind, full, reasons, onApprove, onReject }) {
       )}
       {kind === 'video' ? (
         <video
-          src={item.url}
+          src={mediaUrl(item.url)}
           poster={item.thumbnailUrl}
           controls
           preload="metadata"
           className="w-full rounded bg-black h-32 object-cover"
         />
       ) : (
-        <a href={item.url} target="_blank" rel="noreferrer">
+        <a href={mediaUrl(item.url)} target="_blank" rel="noreferrer">
           <img
-            src={item.url}
+            src={mediaUrl(item.url)}
             alt={item.caption || 'Pending photo'}
             loading="lazy"
             className="w-full h-32 object-cover rounded bg-ink-900"
