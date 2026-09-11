@@ -107,7 +107,9 @@ export default function Families() {
     ? (data.items || []).filter((f) => (status === 'blocked' ? f.blocked : !f.blocked))
     : data.items || [];
 
-  const active = (data.items || []).filter((f) => !f.blocked).length;
+  // From the server, across every family — counting the page would describe
+  // only the rows on screen while reading like a fact about the business.
+  const counts = data.counts || {};
 
   const columns = [
     {
@@ -184,7 +186,14 @@ export default function Families() {
 
   return (
     <>
-      <PageHeader title="Families/Customers" subtitle={`${data.total} accounts · ${active} active`} />
+      <PageHeader
+        title="Families/Customers"
+        subtitle={[
+          `${data.total} accounts`,
+          `${counts.active ?? 0} active`,
+          counts.blocked ? `${counts.blocked} blocked` : null,
+        ].filter(Boolean).join(' · ')}
+      />
 
       <div className="flex flex-wrap gap-3 mb-5">
         <div className="relative flex-1 min-w-[220px] max-w-sm">

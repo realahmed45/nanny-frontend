@@ -123,7 +123,9 @@ export default function Nannies() {
     ? (data.items || []).filter((n) => n.availability === availability)
     : data.items || [];
 
-  const verified = (data.items || []).filter((n) => n.nannyStatus === 'verified').length;
+  // From the server, across every nanny. Counting data.items would describe
+  // only the 25 rows on screen while reading like a fact about the business.
+  const counts = data.counts || {};
 
   const columns = [
     {
@@ -219,7 +221,12 @@ export default function Nannies() {
     <>
       <PageHeader
         title="Nannies"
-        subtitle={`${data.total} registered · ${verified} verified`}
+        subtitle={[
+          `${data.total} registered`,
+          `${counts.verified ?? 0} verified`,
+          counts.pending ? `${counts.pending} awaiting verification` : null,
+          counts.suspended ? `${counts.suspended} suspended` : null,
+        ].filter(Boolean).join(' · ')}
         actions={
           // The count is the point: an empty queue should look empty, and a
           // backlog should be visible without opening anything.

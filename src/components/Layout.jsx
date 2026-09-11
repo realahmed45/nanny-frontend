@@ -8,17 +8,23 @@ import {
   IconSearch, IconBell, IconMenu, IconPhone,
 } from './icons.jsx';
 
+/**
+ * `count` names a number from the dashboard stats; `countLabel` says what it
+ * counts. A red badge with no explanation reads as an error rather than a
+ * queue — "41" beside Nannies looked like something was wrong, when it was
+ * simply 41 people waiting to be verified.
+ */
 const NAV = [
   { to: '/', label: 'Dashboard', Icon: IconDashboard, end: true },
-  { to: '/nannies', label: 'Nannies', Icon: IconNanny, count: 'nannies' },
+  { to: '/nannies', label: 'Nannies', Icon: IconNanny, count: 'nannies', countLabel: 'awaiting verification' },
   { to: '/families', label: 'Families/Customers', Icon: IconFamily },
-  { to: '/callbacks', label: 'Call Straight Away', Icon: IconPhone, count: 'callbacks' },
-  { to: '/bookings', label: 'Bookings', Icon: IconBookings, count: 'bookings' },
+  { to: '/callbacks', label: 'Call Straight Away', Icon: IconPhone, count: 'callbacks', countLabel: 'waiting for a call' },
+  { to: '/bookings', label: 'Bookings', Icon: IconBookings, count: 'bookings', countLabel: 'need a replacement nanny' },
   { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
-  { to: '/payments', label: 'Payments', Icon: IconPayments, count: 'payments' },
+  { to: '/payments', label: 'Payments', Icon: IconPayments, count: 'payments', countLabel: 'awaiting verification' },
   { to: '/pricing', label: 'Pricing', Icon: IconPayments },
   { to: '/areas', label: 'Areas', Icon: IconCalendar },
-  { to: '/support', label: 'Support Tickets', Icon: IconSupport, count: 'tickets' },
+  { to: '/support', label: 'Support Tickets', Icon: IconSupport, count: 'tickets', countLabel: 'open' },
   { to: '/referrals', label: 'Referrals', Icon: IconReferrals },
   { to: '/referral-engine', label: 'Referral Engine', Icon: IconReferrals },
   { to: '/conversations', label: 'Conversations', Icon: IconChats },
@@ -88,7 +94,7 @@ export default function Layout({ admin }) {
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {NAV.map(({ to, label, Icon, end, count }) => {
+          {NAV.map(({ to, label, Icon, end, count, countLabel }) => {
             const n = counts[count];
             return (
               <NavLink
@@ -106,7 +112,11 @@ export default function Layout({ admin }) {
               >
                 <Icon size={18} />
                 <span className="truncate">{label}</span>
-                {n > 0 && <span className="nav-count">{n}</span>}
+                {n > 0 && (
+                  <span className="nav-count" title={countLabel ? `${n} ${countLabel}` : undefined}>
+                    {n}
+                  </span>
+                )}
               </NavLink>
             );
           })}
