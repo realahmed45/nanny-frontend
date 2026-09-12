@@ -129,6 +129,7 @@ export default function Settings({ admin }) {
   const [backupResult, setBackupResult] = useState(null);
   const [accounts, setAccounts] = useState({ instagram: '', facebook: '', tiktok: '' });
   const [savingAccounts, setSavingAccounts] = useState(false);
+  const [savingMode, setSavingMode] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -158,6 +159,24 @@ export default function Settings({ admin }) {
       toastError(err.message);
     } finally {
       setSending(false);
+    }
+  };
+
+  /** Saves immediately: a two-way switch with a Save button invites doubt. */
+  const setConversationMode = async (mode) => {
+    setSavingMode(true);
+    setSettings((prev) => ({ ...prev, conversationMode: { mode } }));
+    try {
+      await api('/settings', { method: 'PATCH', body: { conversationMode: { mode } } });
+      notify(mode === 'ai'
+        ? 'Flexible mode on — the bot will try to understand unusual replies.'
+        : 'Structured mode on — the bot expects exact answers.');
+      load();
+    } catch (e) {
+      toastError(e.message);
+      load();
+    } finally {
+      setSavingMode(false);
     }
   };
 
@@ -420,6 +439,72 @@ export default function Settings({ admin }) {
         {/* Our own accounts, as opposed to a customer's — those live on the
             Follow & Save page. Stored as bare handles so they can be shown as
             a link or as "@name" without being pulled apart again. */}
+        {/* Two ways of reading a reply, not two different bots. The
+            questions, steps and order are identical either way — only the
+            tolerance for how an answer is phrased changes. */}
+        <Panel title="How the Bot Understands People">
+          <p className="text-sm text-slate-400 mb-4">
+            Both options ask the same questions in the same order. The
+            difference is what happens when someone answers in their own words.
+          </p>
+
+          <div className="space-y-3">
+            {[
+              {
+                mode: 'structured',
+                title: 'Structured',
+                blurb: 'The bot expects exact answers — a menu number, "9 AM", a date. Anything else is answered with "Sorry, I didn\’t understand that".',
+                note: 'Predictable, free, and never wrong about what someone meant.',
+              },
+              {
+                mode: 'ai',
+                title: 'Flexible (AI)',
+                blurb: 'Same questions, same steps. When a reply does not fit, the bot tries once to work out what was meant \— "tomorrow morning" becomes a date, "the second one" becomes option 2.',
+                note: 'Only used after the normal reading fails, so nothing gets slower or less reliable.',
+              },
+            ].map((opt) => {
+              const active = (s.conversationMode?.mode || 'structured') === opt.mode;
+              return (
+                <label
+                  key={opt.mode}
+                  className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                    active
+                      ? 'border-brand-500/60 bg-brand-500/10'
+                      : 'border-ink-800 hover:border-ink-700'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-1 accent-brand-500"
+                    checked={active}
+                    disabled={savingMode}
+                    onChange={() => setConversationMode(opt.mode)}
+                  />
+                  <span>
+                    <span className="text-sm font-medium text-white">{opt.title}</span>
+                    <span className="block text-xs text-slate-400 mt-0.5">{opt.blurb}</span>
+                    <span className="block text-[11px] text-slate-600 mt-1">{opt.note}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          {/* Switching this on without a key would change nothing at all, and
+              silently. Better to say so than to let it look active. */}
+          {!s.aiConfigured && (
+            <p className="mt-4 text-xs text-amber-400">
+              No AI key is configured, so Flexible mode will behave exactly like Structured.
+              Set <span className="font-mono">GROQ_API_KEY</span> on the server to enable it.
+            </p>
+          )}
+          {s.aiConfigured && (
+            <p className="mt-4 text-xs text-slate-600">
+              Using Groq, which also powers voice-note transcription — one key covers both.
+            </p>
+          )}
+        </Panel>
+
         <Panel title="Our Social Accounts">
           <p className="text-sm text-slate-400 mb-4">
             The accounts customers are asked to follow. Used by the
