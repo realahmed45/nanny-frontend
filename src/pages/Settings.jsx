@@ -130,6 +130,7 @@ export default function Settings({ admin }) {
   const [accounts, setAccounts] = useState({ instagram: '', facebook: '', tiktok: '' });
   const [savingAccounts, setSavingAccounts] = useState(false);
   const [savingMode, setSavingMode] = useState(false);
+  const [savingEmailVerification, setSavingEmailVerification] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -177,6 +178,24 @@ export default function Settings({ admin }) {
       load();
     } finally {
       setSavingMode(false);
+    }
+  };
+
+  /** Saves immediately, like the mode switch above. */
+  const setEmailVerification = async (enabled) => {
+    setSavingEmailVerification(true);
+    setSettings((prev) => ({ ...prev, emailVerification: { enabled } }));
+    try {
+      await api('/settings', { method: 'PATCH', body: { emailVerification: { enabled } } });
+      notify(enabled
+        ? 'Email verification on — new people will be asked for an email and a code.'
+        : 'Email verification off — registration no longer asks for an email.');
+      load();
+    } catch (e) {
+      toastError(e.message);
+      load();
+    } finally {
+      setSavingEmailVerification(false);
     }
   };
 
@@ -439,6 +458,52 @@ export default function Settings({ admin }) {
         {/* Our own accounts, as opposed to a customer's — those live on the
             Follow & Save page. Stored as bare handles so they can be shown as
             a link or as "@name" without being pulled apart again. */}
+        {/* Off by default, and worth being able to switch without a deploy:
+            when mail stops being delivered this step blocks every single
+            registration, and the fix has to be one click. */}
+        <Panel title="Email Verification">
+          <p className="text-sm text-slate-400 mb-4">
+            Whether registration asks new nannies and families for an email
+            address and a 6-digit code.
+          </p>
+
+          <label
+            className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+              s.emailVerification?.enabled
+                ? 'border-brand-500/60 bg-brand-500/10'
+                : 'border-ink-800 hover:border-ink-700'
+            }`}
+          >
+            <input
+              type="checkbox"
+              className="mt-1 accent-brand-500"
+              checked={!!s.emailVerification?.enabled}
+              disabled={savingEmailVerification}
+              onChange={(e) => setEmailVerification(e.target.checked)}
+            />
+            <span>
+              <span className="text-sm font-medium text-white">
+                Ask for an email and verify it
+              </span>
+              <span className="block text-xs text-slate-400 mt-0.5">
+                Registration asks for an email address, sends a 6-digit code to
+                it, and waits for that code before the account is created.
+              </span>
+              <span className="block text-[11px] text-slate-600 mt-1">
+                Only switch this on while email is actually being delivered. If
+                codes stop arriving, nobody can finish registering.
+              </span>
+            </span>
+          </label>
+
+          {!s.emailVerification?.enabled && (
+            <p className="mt-4 text-xs text-slate-500">
+              Currently off. Registration asks for a name and goes straight on —
+              no email, no code. Accounts are identified by WhatsApp number.
+            </p>
+          )}
+        </Panel>
+
         {/* Two ways of reading a reply, not two different bots. The
             questions, steps and order are identical either way — only the
             tolerance for how an answer is phrased changes. */}
