@@ -524,7 +524,7 @@ export default function Settings({ admin }) {
               {
                 mode: 'ai',
                 title: 'Flexible (AI)',
-                blurb: 'Same questions, same steps. When a reply does not fit, the bot tries once to work out what was meant \— "tomorrow morning" becomes a date, "the second one" becomes option 2.',
+                blurb: 'Same questions, same order. When a reply does not fit, the bot works out what was meant \— "tomorrow morning" becomes a date. And when someone asks a question instead of answering, it replies properly and then asks again, rather than repeating itself.',
                 note: 'Only used after the normal reading fails, so nothing gets slower or less reliable.',
               },
             ].map((opt) => {
