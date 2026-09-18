@@ -131,6 +131,7 @@ export default function Settings({ admin }) {
   const [savingAccounts, setSavingAccounts] = useState(false);
   const [savingMode, setSavingMode] = useState(false);
   const [savingEmailVerification, setSavingEmailVerification] = useState(false);
+  const [savingAutoVerify, setSavingAutoVerify] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -196,6 +197,24 @@ export default function Settings({ admin }) {
       load();
     } finally {
       setSavingEmailVerification(false);
+    }
+  };
+
+  /** Saves immediately, like the switches above. */
+  const setAutoVerifyNannies = async (enabled) => {
+    setSavingAutoVerify(true);
+    setSettings((prev) => ({ ...prev, autoVerifyNannies: { enabled } }));
+    try {
+      await api('/settings', { method: 'PATCH', body: { autoVerifyNannies: { enabled } } });
+      notify(enabled
+        ? 'Auto-verify on — new nannies are approved the moment they finish registering.'
+        : 'Auto-verify off — new nannies wait in the queue for a manual check.');
+      load();
+    } catch (e) {
+      toastError(e.message);
+      load();
+    } finally {
+      setSavingAutoVerify(false);
     }
   };
 
@@ -500,6 +519,60 @@ export default function Settings({ admin }) {
             <p className="mt-4 text-xs text-slate-500">
               Currently off. Registration asks for a name and goes straight on —
               no email, no code. Accounts are identified by WhatsApp number.
+            </p>
+          )}
+        </Panel>
+
+        <Panel title="Nanny Verification">
+          <p className="text-sm text-slate-400 mb-4">
+            Whether a nanny who finishes registering is approved automatically
+            after a short delay, or waits for someone to check her documents.
+          </p>
+
+          <label
+            className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+              s.autoVerifyNannies?.enabled
+                ? 'border-brand-500/60 bg-brand-500/10'
+                : 'border-ink-800 hover:border-ink-700'
+            }`}
+          >
+            <input
+              type="checkbox"
+              className="mt-1 accent-brand-500"
+              checked={!!s.autoVerifyNannies?.enabled}
+              disabled={savingAutoVerify}
+              onChange={(e) => setAutoVerifyNannies(e.target.checked)}
+            />
+            <span>
+              <span className="text-sm font-medium text-white">
+                Verify new nannies automatically after 5 minutes
+              </span>
+              <span className="block text-xs text-slate-400 mt-0.5">
+                A finished profile is approved 5 minutes after she submits it.
+                She is told to expect a short review, then gets a message when
+                her profile goes live — no admin action needed.
+              </span>
+              <span className="block text-[11px] text-slate-600 mt-1">
+                The 5 minutes is a real window: approvals are only applied by a
+                background check that runs every minute, so switching this off
+                before one falls due stops it. Nobody looks at her ID or
+                certificates in the meantime — turn it off once you are
+                reviewing profiles properly.
+              </span>
+            </span>
+          </label>
+
+          {s.autoVerifyNannies?.enabled ? (
+            <p className="mt-4 text-xs text-amber-500/80">
+              Currently on. Every nanny who completes registration goes live
+              5 minutes later, with no document check. Use those 5 minutes to
+              reject anything obviously wrong — under Nannies, a profile can be
+              rejected while it is still pending.
+            </p>
+          ) : (
+            <p className="mt-4 text-xs text-slate-500">
+              Currently off. Every new nanny waits in the review queue until
+              someone approves her under Nannies.
             </p>
           )}
         </Panel>
