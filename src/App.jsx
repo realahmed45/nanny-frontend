@@ -16,6 +16,8 @@ import Areas from './pages/Areas.jsx';
 import MediaQueue from './pages/MediaQueue.jsx';
 import Settings from './pages/Settings.jsx';
 import Pricing from './pages/Pricing.jsx';
+import Earnings from './pages/Earnings.jsx';
+import Contracts from './pages/Contracts.jsx';
 import Activity from './pages/Activity.jsx';
 import ReferralEngine from './pages/ReferralEngine.jsx';
 import Calendar from './pages/Calendar.jsx';
@@ -65,6 +67,8 @@ export default function App() {
           <Route path="calendar" element={<Calendar />} />
           <Route path="payments" element={<Payments />} />
           <Route path="pricing" element={<Pricing />} />
+          <Route path="earnings" element={<Earnings />} />
+          <Route path="contracts" element={<Contracts />} />
           <Route path="activity" element={<Activity />} />
           <Route path="support" element={<Support />} />
           <Route path="referrals" element={<Referrals />} />

@@ -23,6 +23,8 @@ const NAV = [
   { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
   { to: '/payments', label: 'Payments', Icon: IconPayments, count: 'payments', countLabel: 'awaiting verification' },
   { to: '/pricing', label: 'Pricing', Icon: IconPayments },
+  { to: '/earnings', label: 'Earnings', Icon: IconPayments },
+  { to: '/contracts', label: 'Contract Settings', Icon: IconNanny },
   { to: '/areas', label: 'Areas', Icon: IconCalendar },
   { to: '/support', label: 'Support Tickets', Icon: IconSupport, count: 'tickets', countLabel: 'open' },
   { to: '/referrals', label: 'Referrals', Icon: IconReferrals },
