@@ -3,58 +3,21 @@ import api from '../lib/api.js';
 import { PageHeader, Skeleton, ErrorBox, useToast } from '../components/ui.jsx';
 
 /**
- * What the bot says, and how many ways it can say it.
+ * What the bot says when somebody asks a question instead of answering one.
  *
- * Two modes, and the difference is only ever about wording:
+ * The structured flow asks a fixed question at each step and expects a
+ * particular answer back. Real families do not behave that way: asked how
+ * long they need a nanny, they reply "what's the minimum?" — and the flow,
+ * having no answer, repeats the question at them.
  *
- *   Strict    — one wording per question, every time. Predictable, and what
- *               you want when a script is being reviewed or trained against.
- *   Flexible  — one of several written alternatives, picked at random, so a
- *               long booking does not read like a machine reciting a form.
- *
- * Nothing here is generated. Every alternative is written down, editable on
- * this page, and stored — which is the point. A bot that invents its own
- * wording can change what a question means without anyone noticing until a
- * booking is wrong.
- *
- * Separate from the conversation mode on the Settings page: that one governs
- * how a family's *reply* is understood. This governs how the *question* is
- * put. They do not affect each other.
+ * This page is the answer sheet for those moments. The questions themselves
+ * never change; only what the bot can say when asked something at that point.
+ * An empty box means the bot behaves exactly as it does today.
  */
 
-/** Some questions are never varied. The reason is worth showing. */
-function FixedBadge({ reason }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400"
-      title={reason || 'This question is always asked the same way.'}
-    >
-      Always strict
-    </span>
-  );
-}
-
-function Question({ q, onSave, onReset, busy }) {
+function Step({ step, value, onChange, disabled }) {
   const [open, setOpen] = useState(false);
-  const [strict, setStrict] = useState(q.strict || '');
-  const [flexible, setFlexible] = useState(q.flexible || []);
-
-  // A save elsewhere on the page reloads every question, so local edits are
-  // re-seeded from what came back rather than left showing stale text.
-  useEffect(() => {
-    setStrict(q.strict || '');
-    setFlexible(q.flexible || []);
-  }, [q.strict, q.flexible]);
-
-  const dirty =
-    strict !== (q.strict || '') ||
-    JSON.stringify(flexible) !== JSON.stringify(q.flexible || []);
-
-  const setVariant = (i, value) =>
-    setFlexible((list) => list.map((v, j) => (j === i ? value : v)));
-
-  const addVariant = () => setFlexible((list) => [...list, '']);
-  const removeVariant = (i) => setFlexible((list) => list.filter((_, j) => j !== i));
+  const answered = Boolean(value?.trim());
 
   return (
     <div className="card p-4">
@@ -63,126 +26,65 @@ function Question({ q, onSave, onReset, busy }) {
         className="flex w-full items-start justify-between gap-3 text-left"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-white">{q.label}</span>
-            {q.fixed && <FixedBadge reason={q.fixedBecause} />}
-            {q.edited && (
-              <span className="rounded-md bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-400">
-                Edited
+            {/* The bot's question, shown as it is actually asked. It is not
+                editable here: the flow is structured and stays that way. */}
+            <span className="text-sm font-medium text-white">
+              {step.question.split('\n')[0]}
+            </span>
+            {answered ? (
+              <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+                Answer written
               </span>
-            )}
-            {!q.fixed && (
-              <span className="text-[11px] text-slate-500">
-                {(q.flexible?.length || 0)} wording
-                {(q.flexible?.length || 0) === 1 ? '' : 's'}
+            ) : (
+              <span className="rounded-md bg-ink-800 px-2 py-0.5 text-[11px] text-slate-500">
+                Empty
               </span>
             )}
           </span>
           <span className="mt-1 block truncate font-mono text-xs text-slate-500">
-            {q.key}
+            {step.key}
           </span>
         </span>
         <span className="mt-1 shrink-0 text-slate-500">{open ? '−' : '+'}</span>
       </button>
 
       {open && (
-        <div className="mt-4 space-y-4 border-t border-ink-800 pt-4">
-          {q.placeholders?.length > 0 && (
+        <div className="mt-4 space-y-3 border-t border-ink-800 pt-4">
+          <div>
+            <p className="text-xs text-slate-500">The bot asks:</p>
+            <pre className="mt-1 whitespace-pre-wrap rounded-lg bg-ink-950/60 p-3 font-mono text-xs text-slate-400">
+              {step.question}
+            </pre>
+          </div>
+
+          {/* What people actually say here instead of answering — so the box
+              is filled in with the real questions in mind. */}
+          {step.asks?.length > 0 && (
             <p className="text-xs text-slate-500">
-              Must keep{' '}
-              <span className="font-mono text-slate-400">
-                {q.placeholders.join(', ')}
-              </span>{' '}
-              — it is replaced with the real name when the message is sent.
+              People often ask:{' '}
+              {step.asks.map((a, i) => (
+                <span key={a} className="text-slate-400">
+                  {i > 0 && ' · '}&ldquo;{a}&rdquo;
+                </span>
+              ))}
             </p>
           )}
 
           <label className="block">
             <span className="mb-1 block text-xs text-slate-500">
-              Strict — used every time in strict mode
+              Your answer — what the bot should say if they ask something here
             </span>
             <textarea
-              className="input font-mono text-xs"
-              rows={Math.min(6, (strict.match(/\n/g)?.length || 0) + 2)}
-              value={strict}
-              onChange={(e) => setStrict(e.target.value)}
-              disabled={busy || q.strict === null}
+              className="input text-sm"
+              rows={4}
+              value={value}
+              disabled={disabled}
+              placeholder="Leave empty and the bot just asks the question again, as it does now."
+              onChange={(e) => onChange(step.key, e.target.value)}
             />
           </label>
-
-          {q.fixed ? (
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-slate-400">
-              {q.fixedBecause}
-            </p>
-          ) : (
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs text-slate-500">
-                  Flexible — one of these, picked at random
-                </span>
-                <button
-                  type="button"
-                  className="btn-ghost text-xs"
-                  onClick={addVariant}
-                  disabled={busy || flexible.length >= 8}
-                >
-                  Add wording
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {flexible.map((v, i) => (
-                  <div key={i} className="flex gap-2">
-                    <textarea
-                      className="input flex-1 font-mono text-xs"
-                      rows={Math.min(5, (v.match(/\n/g)?.length || 0) + 2)}
-                      value={v}
-                      onChange={(e) => setVariant(i, e.target.value)}
-                      disabled={busy}
-                    />
-                    <button
-                      type="button"
-                      className="btn-ghost shrink-0 text-xs"
-                      onClick={() => removeVariant(i)}
-                      disabled={busy || flexible.length <= 1}
-                      title={flexible.length <= 1 ? 'At least one wording is needed' : 'Remove'}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {q.hasOptions && (
-                <p className="mt-2 text-xs text-slate-500">
-                  The numbered options are added automatically and are never
-                  reworded — only the sentence above them changes.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2">
-            {q.edited && (
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => onReset(q.key)}
-                disabled={busy}
-              >
-                Reset to default
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => onSave(q.key, { strict, flexible: q.fixed ? undefined : flexible })}
-              disabled={busy || !dirty}
-            >
-              Save
-            </button>
-          </div>
         </div>
       )}
     </div>
@@ -192,63 +94,61 @@ function Question({ q, onSave, onReset, busy }) {
 export default function Chatbot() {
   const { toast, notify, error: toastError } = useToast();
   const [data, setData] = useState(null);
+  const [answers, setAnswers] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const load = () => {
     setLoading(true);
-    api('/phrasing')
-      .then((d) => { setData(d); setError(null); })
+    api('/replies')
+      .then((d) => {
+        setData(d);
+        setAnswers(Object.fromEntries(d.steps.map((s) => [s.key, s.answer || ''])));
+        setError(null);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
 
-  const setMode = (mode) => {
+  /** One save for the whole sheet, since it is edited as one page. */
+  const save = (patch = {}) => {
     setBusy(true);
-    setData((d) => ({ ...d, mode }));   // reflect the click immediately
-    api('/settings', { method: 'PATCH', body: { phrasing: { mode } } })
-      .then(() => notify(mode === 'flexible'
-        ? 'Flexible wording is on. The bot will vary how it asks.'
-        : 'Strict wording is on. The bot asks the same way every time.'))
-      .catch((e) => { toastError(e.message); load(); })
-      .finally(() => setBusy(false));
-  };
-
-  const save = (key, value) => {
-    setBusy(true);
-    const overrides = {};
-    for (const q of data.questions) {
-      if (q.edited && q.key !== key) {
-        overrides[q.key] = { strict: q.strict, flexible: q.flexible ?? undefined };
-      }
-    }
-    overrides[key] = value;
-
-    api('/settings', { method: 'PATCH', body: { phrasingOverrides: overrides } })
-      .then(() => { notify('Wording saved'); load(); })
+    const body = {
+      replySheet: {
+        enabled: patch.enabled ?? data.enabled,
+        mode: patch.mode ?? data.mode,
+        answers: patch.answers ?? answers,
+      },
+    };
+    return api('/settings', { method: 'PATCH', body })
+      .then(() => { notify('Saved'); load(); })
       .catch((e) => toastError(e.message))
       .finally(() => setBusy(false));
   };
 
-  const reset = (key) => {
-    setBusy(true);
-    api(`/phrasing/${key}`, { method: 'DELETE' })
-      .then(() => { notify('Reset to the wording that ships in the code'); load(); })
-      .catch((e) => toastError(e.message))
-      .finally(() => setBusy(false));
-  };
+  const dirty =
+    data && data.steps.some((s) => (answers[s.key] || '') !== (s.answer || ''));
 
-  const flexible = data?.mode === 'flexible';
+  const written = Object.values(answers).filter((v) => v?.trim()).length;
+
+  // Steps are grouped in the order a family meets them, so the sheet reads
+  // as a walk through the booking rather than an alphabetical list.
+  const groups = data
+    ? data.steps.reduce((acc, s) => {
+      (acc[s.group] ||= []).push(s);
+      return acc;
+    }, {})
+    : {};
 
   return (
     <div className="space-y-5">
       {toast}
       <PageHeader
-        title="Chatbot wording"
-        subtitle="Every question the bot asks, and how many ways it can ask it. Nothing here is AI-generated."
+        title="Chatbot answers"
+        subtitle="What the bot says when a family asks a question instead of answering one. The questions themselves never change."
       />
 
       {error && <ErrorBox error={error} onRetry={load} />}
@@ -257,64 +157,107 @@ export default function Chatbot() {
       {!loading && !error && data && (
         <>
           <div className="card p-5">
-            <h2 className="text-sm font-medium text-white">Wording mode</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              This is about how questions are <em>worded</em>. How a family&apos;s
-              reply is <em>understood</em> is set separately, under Settings.
-            </p>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {[
-                {
-                  mode: 'strict',
-                  title: 'Strict',
-                  blurb: 'One wording per question, every time. Predictable, and the easiest to review or train staff against.',
-                },
-                {
-                  mode: 'flexible',
-                  title: 'Flexible',
-                  blurb: 'One of several written wordings, picked at random, so a long booking does not read like a form. Every alternative is written and stored — never generated.',
-                },
-              ].map((opt) => {
-                const active = data.mode === opt.mode;
-                return (
-                  <label
-                    key={opt.mode}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-                      active
-                        ? 'border-brand-500/60 bg-brand-500/10'
-                        : 'border-ink-800 hover:border-ink-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="phrasing"
-                      className="mt-1 accent-brand-500"
-                      checked={active}
-                      disabled={busy}
-                      onChange={() => setMode(opt.mode)}
-                    />
-                    <span>
-                      <span className="text-sm font-medium text-white">{opt.title}</span>
-                      <span className="mt-0.5 block text-xs text-slate-400">{opt.blurb}</span>
-                    </span>
-                  </label>
-                );
-              })}
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-medium text-white">Answer sheet</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Off by default. While it is off the bot behaves exactly as it
+                  does today — a question it cannot parse just gets asked again.
+                </p>
+              </div>
+              <label className="flex shrink-0 cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="accent-brand-500"
+                  checked={data.enabled}
+                  disabled={busy}
+                  onChange={(e) => save({ enabled: e.target.checked })}
+                />
+                <span className="text-sm text-slate-300">
+                  {data.enabled ? 'On' : 'Off'}
+                </span>
+              </label>
             </div>
 
+            {data.enabled && (
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {[
+                  {
+                    mode: 'strict',
+                    title: 'Strict',
+                    blurb: 'Reply with exactly what you wrote, word for word. Nothing is reworded or added.',
+                  },
+                  {
+                    mode: 'flexible',
+                    title: 'Flexible',
+                    blurb: 'The same facts, worded to fit what they actually asked. It can only use what you wrote — it never adds a price, number or promise of its own.',
+                  },
+                ].map((opt) => {
+                  const active = data.mode === opt.mode;
+                  return (
+                    <label
+                      key={opt.mode}
+                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                        active
+                          ? 'border-brand-500/60 bg-brand-500/10'
+                          : 'border-ink-800 hover:border-ink-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="replyMode"
+                        className="mt-1 accent-brand-500"
+                        checked={active}
+                        disabled={busy}
+                        onChange={() => save({ mode: opt.mode })}
+                      />
+                      <span>
+                        <span className="text-sm font-medium text-white">{opt.title}</span>
+                        <span className="mt-0.5 block text-xs text-slate-400">{opt.blurb}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
             <p className="mt-4 text-xs text-slate-500">
-              {data.counts.total} questions · {data.counts.fixed} always strict ·{' '}
-              {data.counts.edited} edited here
-              {flexible && ' · flexible wording is live'}
+              {written} of {data.counts.total} steps have an answer written.
+              {!data.enabled && ' The sheet is off, so none of them are in use.'}
             </p>
           </div>
 
-          <div className="space-y-3">
-            {data.questions.map((q) => (
-              <Question key={q.key} q={q} onSave={save} onReset={reset} busy={busy} />
-            ))}
-          </div>
+          {Object.entries(groups).map(([group, steps]) => (
+            <div key={group} className="space-y-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                {group}
+              </h3>
+              {steps.map((s) => (
+                <Step
+                  key={s.key}
+                  step={s}
+                  value={answers[s.key] ?? ''}
+                  disabled={busy}
+                  onChange={(key, v) => setAnswers((a) => ({ ...a, [key]: v }))}
+                />
+              ))}
+            </div>
+          ))}
+
+          {/* Pinned, because the sheet is long and a save button at the very
+              bottom is one somebody scrolls past and forgets. */}
+          {dirty && (
+            <div className="sticky bottom-4 flex justify-end">
+              <button
+                type="button"
+                className="btn-primary shadow-2xl"
+                onClick={() => save()}
+                disabled={busy}
+              >
+                {busy ? 'Saving…' : 'Save answers'}
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>
