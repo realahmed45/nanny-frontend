@@ -15,6 +15,34 @@ import { PageHeader, Skeleton, ErrorBox, useToast } from '../components/ui.jsx';
  * An empty box means the bot behaves exactly as it does today.
  */
 
+/**
+ * The two modes, and one worked example carried through both.
+ *
+ * The example is the same written answer in each, so the difference is the
+ * reply and nothing else — which is the only thing that actually differs.
+ */
+const EXAMPLE = {
+  written: 'Minimum 3 hours. Overtime is 1.5x after 8 hours.',
+  asked: 'can she stay a bit longer if we run late?',
+};
+
+const MODES = [
+  {
+    mode: 'strict',
+    title: 'Strict',
+    blurb: 'Sends exactly what you wrote, word for word. Nothing is reworded, shortened or added.',
+    example: 'Minimum 3 hours. Overtime is 1.5x after 8 hours.',
+    note: 'Predictable and always correct, but can read as blunt when it only half answers what was asked.',
+  },
+  {
+    mode: 'flexible',
+    title: 'Flexible',
+    blurb: 'Answers the question they actually asked, using only the facts you wrote. Never adds a price, number or promise of its own.',
+    example: 'Yes — she can stay on, and overtime is charged at 1.5x after 8 hours.',
+    note: 'Reads naturally. If your note does not cover what they asked, it says what it does cover rather than guessing.',
+  },
+];
+
 function Step({ step, value, onChange, disabled }) {
   const [open, setOpen] = useState(false);
   const answered = Boolean(value?.trim());
@@ -224,47 +252,78 @@ export default function Chatbot() {
               </label>
             </div>
 
-            {data.enabled && (
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {[
-                  {
-                    mode: 'strict',
-                    title: 'Strict',
-                    blurb: 'Reply with exactly what you wrote, word for word. Nothing is reworded or added.',
-                  },
-                  {
-                    mode: 'flexible',
-                    title: 'Flexible',
-                    blurb: 'The same facts, worded to fit what they actually asked. It can only use what you wrote — it never adds a price, number or promise of its own.',
-                  },
-                ].map((opt) => {
+            {/* Always shown, whether or not the sheet is switched on: the
+                difference between the two modes is the thing somebody comes
+                to this page to understand, and hiding it behind the toggle
+                means finding it by accident. */}
+            <div className="mt-5">
+              <p className="mb-2 text-xs text-slate-500">
+                How the written answer is used
+              </p>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {MODES.map((opt) => {
                   const active = data.mode === opt.mode;
                   return (
-                    <label
+                    <button
                       key={opt.mode}
-                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                      type="button"
+                      disabled={busy}
+                      onClick={() => save({ mode: opt.mode })}
+                      className={`rounded-lg border p-4 text-left transition-colors disabled:opacity-50 ${
                         active
                           ? 'border-brand-500/60 bg-brand-500/10'
                           : 'border-ink-800 hover:border-ink-700'
                       }`}
                     >
-                      <input
-                        type="radio"
-                        name="replyMode"
-                        className="mt-1 accent-brand-500"
-                        checked={active}
-                        disabled={busy}
-                        onChange={() => save({ mode: opt.mode })}
-                      />
-                      <span>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 ${
+                            active ? 'border-brand-500' : 'border-ink-700'
+                          }`}
+                        >
+                          {active && <span className="h-2 w-2 rounded-full bg-brand-500" />}
+                        </span>
                         <span className="text-sm font-medium text-white">{opt.title}</span>
-                        <span className="mt-0.5 block text-xs text-slate-400">{opt.blurb}</span>
+                        {active && (
+                          <span className="rounded-md bg-brand-500/15 px-2 py-0.5 text-[11px] font-medium text-brand-400">
+                            Selected
+                          </span>
+                        )}
                       </span>
-                    </label>
+
+                      <span className="mt-2 block text-xs text-slate-400">{opt.blurb}</span>
+
+                      {/* The same written answer, shown as each mode would
+                          actually send it. Two sentences of explanation never
+                          land as well as seeing the difference. */}
+                      <span className="mt-3 block rounded-lg bg-ink-950/60 p-3">
+                        <span className="block text-[11px] text-slate-500">
+                          You wrote: <span className="text-slate-400">&ldquo;{EXAMPLE.written}&rdquo;</span>
+                        </span>
+                        <span className="mt-2 block text-[11px] text-slate-500">
+                          They ask: <span className="text-slate-400">&ldquo;{EXAMPLE.asked}&rdquo;</span>
+                        </span>
+                        <span className="mt-2 block text-[11px] text-slate-500">
+                          Bot replies:
+                        </span>
+                        <span className="mt-0.5 block text-xs text-emerald-400">
+                          {opt.example}
+                        </span>
+                      </span>
+
+                      <span className="mt-2 block text-[11px] text-slate-600">{opt.note}</span>
+                    </button>
                   );
                 })}
               </div>
-            )}
+
+              {!data.enabled && (
+                <p className="mt-3 text-xs text-amber-400/80">
+                  The sheet is switched off, so neither mode is in use yet.
+                </p>
+              )}
+            </div>
 
             <p className="mt-4 text-xs text-slate-500">
               {written} of {data.counts.total} steps have an answer written.
