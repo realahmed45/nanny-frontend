@@ -151,6 +151,51 @@ export default function Chatbot() {
         subtitle="What the bot says when a family asks a question instead of answering one. The questions themselves never change."
       />
 
+      {/* Which flow this sheet belongs to, stated before anything else.
+          The whole page only applies to the structured flow, and somebody
+          filling in answers deserves to know that before they start rather
+          than after — especially if the bot is currently running on AI, in
+          which case none of it is in use. */}
+      {!loading && !error && data && (
+        <div
+          className={`card border-l-4 p-4 ${
+            data.conversationMode === 'structured'
+              ? 'border-emerald-500/70'
+              : 'border-amber-500/70'
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-white">
+              Structured mode
+            </span>
+            {data.conversationMode === 'structured' ? (
+              <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+                Live
+              </span>
+            ) : (
+              <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-400">
+                Not live — the bot is on AI mode
+              </span>
+            )}
+          </div>
+
+          <p className="mt-1.5 text-xs text-slate-400">
+            The bot asks a fixed set of questions, in a fixed order, and reads
+            the reply with the strict parser. Everything on this page applies
+            to that flow: the questions below are exactly what it asks, and
+            they are not editable.
+          </p>
+
+          {data.conversationMode !== 'structured' && (
+            <p className="mt-2 text-xs text-amber-300/90">
+              The bot is currently running in AI mode, so these answers are not
+              being used. Switch the conversation mode to structured under
+              Settings to put them into effect.
+            </p>
+          )}
+        </div>
+      )}
+
       {error && <ErrorBox error={error} onRetry={load} />}
       {loading && <Skeleton rows={6} />}
 
