@@ -25,6 +25,7 @@ const NAV = [
   { to: '/pricing', label: 'Pricing', Icon: IconPayments },
   { to: '/earnings', label: 'Earnings', Icon: IconPayments },
   { to: '/contracts', label: 'Contract Settings', Icon: IconNanny },
+  { to: '/chatbot', label: 'Chatbot Wording', Icon: IconChats },
   { to: '/areas', label: 'Areas', Icon: IconCalendar },
   { to: '/support', label: 'Support Tickets', Icon: IconSupport, count: 'tickets', countLabel: 'open' },
   { to: '/referrals', label: 'Referrals', Icon: IconReferrals },
