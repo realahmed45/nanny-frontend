@@ -96,6 +96,8 @@ function EditPanel({ nannyId, onClose, onSaved }) {
           minimumHoursPerWeek: d.contract?.minimumHoursPerWeek || 0,
           minimumShiftsPerWeek: d.contract?.minimumShiftsPerWeek || 0,
           safetyBufferPercent: d.contract?.safetyBufferPercent ?? 20,
+          salaryPeriod: d.contract?.salaryPeriod || 'weekly',
+          salaryAmount: d.contract?.salaryAmount || 0,
           notes: d.contract?.notes || '',
           documentUrl: d.contract?.documentUrl || '',
           documentUploadedAt: d.contract?.documentUploadedAt || null,
@@ -182,16 +184,58 @@ function EditPanel({ nannyId, onClose, onSaved }) {
         onChange={(v) => setForm((f) => ({ ...f, hourlyRate: v }))}
       />
 
+      {/* Weekly or monthly. The guaranteed hours below are read against
+          whichever this is — 40 a week is four times the promise that 40 a
+          month is — so the two belong together on the form. */}
+      <div>
+        <span className="mb-1 block text-xs text-slate-500">She is paid</span>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            { value: 'weekly', label: 'Weekly', hint: 'Guarantee is per week' },
+            { value: 'monthly', label: 'Monthly', hint: 'Guarantee is per month' },
+          ].map((opt) => {
+            const active = form.salaryPeriod === opt.value;
+            return (
+              <label
+                key={opt.value}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                  active ? 'border-brand-500/60 bg-brand-500/10' : 'border-ink-800 hover:border-ink-700'
+                }`}
+              >
+                <input
+                  type="radio" name="salaryPeriod" className="mt-1 accent-brand-500"
+                  checked={active}
+                  onChange={() => setForm((f) => ({ ...f, salaryPeriod: opt.value }))}
+                />
+                <span>
+                  <span className="text-sm font-medium text-white">{opt.label}</span>
+                  <span className="mt-0.5 block text-xs text-slate-500">{opt.hint}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <Num
+        label="Fixed salary (leave at 0 if she is paid by the hour)"
+        value={form.salaryAmount}
+        step={100000}
+        suffix={`Rp / ${form.salaryPeriod === 'monthly' ? 'month' : 'week'}`}
+        hint="For a nanny on a set wage rather than an hourly rate."
+        onChange={(v) => setForm((f) => ({ ...f, salaryAmount: v }))}
+      />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <Num
-          label="Minimum hours per week"
+          label={`Minimum hours per ${form.salaryPeriod === 'monthly' ? 'month' : 'week'}`}
           value={form.minimumHoursPerWeek}
           suffix="hrs"
           hint="Guaranteed: if she is booked below this, she is still paid it."
           onChange={(v) => setForm((f) => ({ ...f, minimumHoursPerWeek: v }))}
         />
         <Num
-          label="Minimum client visits per week"
+          label={`Minimum client visits per ${form.salaryPeriod === 'monthly' ? 'month' : 'week'}`}
           value={form.minimumShiftsPerWeek}
           suffix="visits"
           hint="Counted separately — hours can be met while visits are short."

@@ -184,6 +184,150 @@ function CostForm({ categories, onSaved, onError, notify }) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Special payouts
+ * ------------------------------------------------------------------ */
+
+const BLANK_SPECIAL = { nannyId: '', amount: '', reason: '', note: '' };
+
+/**
+ * Something owed to a nanny that no booking covers.
+ *
+ * A taxi she paid for, a uniform, a medical bill. Both the reason and the
+ * receipt are required, because unlike earnings there is no booking behind
+ * the figure to check it against — a payment to a person with neither is
+ * indistinguishable from a mistake.
+ */
+function SpecialPayoutForm({ nannies, onSaved, onError, notify }) {
+  const [form, setForm] = useState(BLANK_SPECIAL);
+  const [proofUrl, setProofUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const upload = (file) => {
+    if (!file) return;
+    setBusy(true);
+    const reader = new FileReader();
+    reader.onerror = () => { onError('The file could not be read'); setBusy(false); };
+    reader.onload = () => {
+      const ext = (file.name.match(/\.[a-z0-9]+$/i)?.[0] || '.jpg').toLowerCase();
+      api('/payouts/proof-upload', {
+        method: 'POST',
+        body: { data: String(reader.result).split(',')[1], ext },
+      })
+        .then((r) => { setProofUrl(r.url); notify('Receipt attached'); })
+        .catch((e) => onError(e.message))
+        .finally(() => setBusy(false));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!proofUrl) return onError('Please attach a photo of the receipt');
+    setBusy(true);
+    api('/payouts/special', {
+      method: 'POST',
+      body: { ...form, amount: Number(form.amount), costProofUrl: proofUrl },
+    })
+      .then(() => {
+        notify('Payment raised');
+        setForm(BLANK_SPECIAL);
+        setProofUrl('');
+        onSaved();
+      })
+      .catch((err) => onError(err.message))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <form onSubmit={submit} className="card space-y-4 p-5">
+      <div>
+        <h3 className="text-sm font-medium text-white">Pay a nanny for something</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Anything outside her earnings — a taxi she covered, a uniform, a
+          medical cost. The receipt is required.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Nanny</span>
+          <select
+            className="input" required value={form.nannyId}
+            onChange={(e) => set('nannyId', e.target.value)}
+          >
+            <option value="">Choose…</option>
+            {nannies.map((n) => (
+              <option key={n.nannyId} value={n.nannyId}>{n.name}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Amount</span>
+          <input
+            type="number" min="0" step="1000" className="input font-mono" required
+            placeholder="0" value={form.amount}
+            onChange={(e) => set('amount', e.target.value)}
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Receipt</span>
+          {proofUrl ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-emerald-400">Attached</span>
+              <button
+                type="button" className="btn-ghost text-xs"
+                onClick={() => setProofUrl('')}
+              >
+                Replace
+              </button>
+            </div>
+          ) : (
+            <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-ink-700 px-3 py-2.5 text-xs text-slate-400 hover:border-ink-600">
+              <input
+                type="file" className="hidden" accept=".jpg,.jpeg,.png,.webp,.pdf"
+                disabled={busy}
+                onChange={(e) => upload(e.target.files?.[0])}
+              />
+              {busy ? 'Uploading…' : 'Attach a photo'}
+            </label>
+          )}
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="mb-1 block text-xs text-slate-500">What is it for?</span>
+        <input
+          type="text" className="input" required
+          placeholder="Taxi to the Seminyak booking, replacement uniform, clinic visit…"
+          value={form.reason}
+          onChange={(e) => set('reason', e.target.value)}
+        />
+      </label>
+
+      <label className="block">
+        <span className="mb-1 block text-xs text-slate-500">Note (optional)</span>
+        <textarea
+          className="input text-sm" rows={2}
+          placeholder="Anything else worth recording about this payment."
+          value={form.note}
+          onChange={(e) => set('note', e.target.value)}
+        />
+      </label>
+
+      <div className="flex justify-end">
+        <button type="submit" className="btn-primary" disabled={busy}>
+          {busy ? 'Saving…' : 'Raise payment'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * The page
  * ------------------------------------------------------------------ */
 
@@ -265,23 +409,6 @@ export default function Finance() {
 
       {!loading && !error && data && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat
-              label="Total revenue" value={money(t.revenue)}
-              hint={`${t.bookings} booking${t.bookings === 1 ? '' : 's'}, ${t.days} day${t.days === 1 ? '' : 's'}`}
-            />
-            <Stat label="Paid to nannies" value={money(t.paidToNannies)} tone="amber" />
-            <Stat
-              label="Running costs" value={money(t.costs)} tone="red"
-              hint={costs?.voidedCount ? `${costs.voidedCount} voided row(s) excluded` : null}
-            />
-            <Stat
-              label="Net profit" value={money(t.netProfit)}
-              tone={t.netProfit >= 0 ? 'green' : 'red'}
-              hint={`${t.netMarginPercent}% of revenue · gross ${money(t.grossProfit)}`}
-            />
-          </div>
-
           {/* A booking with no nanny rate cannot be settled, and its whole
               family payment looks like profit. Said plainly rather than left
               to make every figure above quietly wrong. */}
@@ -424,6 +551,14 @@ export default function Finance() {
 
           {tab === 'payouts' && (
             <>
+              {canEdit && (
+                <SpecialPayoutForm
+                  nannies={data.byNanny}
+                  notify={notify}
+                  onError={toastError}
+                  onSaved={load}
+                />
+              )}
               <div className="grid gap-3 sm:grid-cols-2">
                 <Stat label="Paid out" value={money(data.payouts.paid)} tone="green" />
                 <Stat
