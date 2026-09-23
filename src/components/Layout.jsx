@@ -24,6 +24,7 @@ const NAV = [
   { to: '/payments', label: 'Payments', Icon: IconPayments, count: 'payments', countLabel: 'awaiting verification' },
   { to: '/pricing', label: 'Pricing', Icon: IconPayments },
   { to: '/earnings', label: 'Earnings', Icon: IconPayments },
+  { to: '/finance', label: 'Finance', Icon: IconPayments },
   { to: '/contracts', label: 'Contract Settings', Icon: IconNanny },
   { to: '/chatbot', label: 'Chatbot Answers', Icon: IconChats },
   { to: '/areas', label: 'Areas', Icon: IconCalendar },
