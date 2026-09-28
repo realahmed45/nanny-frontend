@@ -577,6 +577,9 @@ export default function Finance() {
   const canEdit = ['finance', 'super_admin'].includes(me?.role);
 
   const voidCost = (id) => {
+    // A financial record, and the row it affects is one of many in a dense
+    // table — easy to hit the wrong one.
+    if (!window.confirm('Void this cost? It will stop counting toward every total.')) return;
     api(`/costs/${id}`, { method: 'DELETE' })
       .then(() => { notify('Cost voided'); load(); })
       .catch((e) => toastError(e.message));

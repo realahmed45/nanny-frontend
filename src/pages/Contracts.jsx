@@ -137,6 +137,7 @@ function EditPanel({ nannyId, onClose, onSaved }) {
 
   /** Clears the pointer only — the archived file is deliberately kept. */
   const removeDoc = () => {
+    if (!window.confirm('Remove the signed contract from her record?')) return;
     setUploading(true);
     api(`/contracts/${nannyId}/document`, { method: 'DELETE' })
       .then(() => {

@@ -248,10 +248,14 @@ export default function MediaTab({ nanny, onChanged }) {
       : `${noun(kind)} removed from her profile.`,
   );
 
-  const remove = (kind, item) => run(
-    () => api(`/nannies/${nanny._id}/${path(kind)}/${item._id}`, { method: 'DELETE' }),
-    `${noun(kind)} deleted.`,
-  );
+  // Permanent, and it is her own photo or video — she may have no other copy.
+  const remove = (kind, item) => {
+    if (!window.confirm(`Delete this ${noun(kind).toLowerCase()} permanently? This cannot be undone.`)) return undefined;
+    return run(
+      () => api(`/nannies/${nanny._id}/${path(kind)}/${item._id}`, { method: 'DELETE' }),
+      `${noun(kind)} deleted.`,
+    );
+  };
 
   const add = (kind, url, label) => run(
     () => api(`/nannies/${nanny._id}/${path(kind)}`, {

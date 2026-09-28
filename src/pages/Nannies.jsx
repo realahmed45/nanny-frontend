@@ -107,7 +107,21 @@ export default function Nannies() {
     open({ _id: person._id, fullName: person.fullName });
   };
 
+  /**
+   * Each of these messages her on WhatsApp the moment it runs, and a sent
+   * message cannot be recalled. Suspending also locks her out of her account.
+   * They were single-click, next to each other, in a modal reached by tapping a
+   * row — the booking page already confirms far less consequential things.
+   */
+  const CONFIRM = {
+    verify: 'Verify this nanny? She will be told she is approved and can start taking bookings.',
+    reject: 'Reject this nanny? She will be told her profile was not accepted.',
+    suspend: 'Suspend this nanny? She will be locked out and told her account is suspended.',
+  };
+
   const act = async (path, label) => {
+    const ask = CONFIRM[path];
+    if (ask && !window.confirm(ask)) return;
     try {
       await api(`/nannies/${selected._id}/${path}`, { method: 'POST' });
       notify(`${selected.fullName} ${label}.`);
