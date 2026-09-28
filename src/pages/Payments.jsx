@@ -68,6 +68,25 @@ export default function Payments() {
     }
   };
 
+  /** Upload a photo of the transfer and keep the hosted URL it returns. */
+  const uploadProof = (file) => {
+    if (!file) return;
+    setBusy(true);
+    const reader = new FileReader();
+    reader.onerror = () => { toastError('The file could not be read'); setBusy(false); };
+    reader.onload = () => {
+      const ext = (file.name.match(/\.[a-z0-9]+$/i)?.[0] || '.jpg').toLowerCase();
+      api('/payouts/proof-upload', {
+        method: 'POST',
+        body: { data: String(reader.result).split(',')[1], ext },
+      })
+        .then((r) => { setProofUrl(r.url); notify('Proof attached'); })
+        .catch((e) => toastError(e.message))
+        .finally(() => setBusy(false));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const approve = () => act(
     `/payments/${selected._id}/approve`, { note },
     'Payment approved — the nanny has been notified.',
@@ -266,7 +285,12 @@ export default function Payments() {
         footer={selected && (
           isPayout ? (
             ['pending', 'processing'].includes(selected.status) && (
-              <button className="btn-primary" onClick={markPayoutPaid} disabled={busy}>
+              <button
+                className="btn-primary"
+                onClick={markPayoutPaid}
+                disabled={busy || !proofUrl}
+                title={proofUrl ? undefined : 'Attach a photo of the transfer first'}
+              >
                 {busy ? 'Saving…' : 'Mark as transferred'}
               </button>
             )
@@ -376,14 +400,35 @@ export default function Payments() {
               || (selected.kind === 'refund' && selected.status === 'refund_in_process')) && (
               <div className="space-y-3">
                 <div>
-                  <label className="label" htmlFor="proof">Receipt image URL (optional)</label>
-                  <input
-                    id="proof"
-                    className="input"
-                    placeholder="https://…"
-                    value={proofUrl}
-                    onChange={(e) => setProofUrl(e.target.value)}
-                  />
+                  <span className="label">
+                    Proof of transfer
+                    {isPayout
+                      ? <span className="text-slate-600"> (required)</span>
+                      : <span className="text-slate-600"> (optional)</span>}
+                  </span>
+                  {proofUrl ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-emerald-400">Attached</span>
+                      <button
+                        type="button"
+                        className="btn-ghost text-xs"
+                        onClick={() => setProofUrl('')}
+                      >
+                        Replace
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-ink-700 px-3 py-2.5 text-xs text-slate-400 hover:border-ink-600">
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".jpg,.jpeg,.png,.webp,.pdf"
+                        disabled={busy}
+                        onChange={(e) => uploadProof(e.target.files?.[0])}
+                      />
+                      {busy ? 'Uploading…' : 'Attach a photo'}
+                    </label>
+                  )}
                 </div>
                 <div>
                   <label className="label" htmlFor="pnote">Note (optional)</label>

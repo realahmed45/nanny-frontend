@@ -210,13 +210,27 @@ const AVATAR_TONES = [
   'bg-rose-500/20 text-rose-300', 'bg-cyan-500/20 text-cyan-300',
 ];
 
-export function Avatar({ name, size = 'md' }) {
+export function Avatar({ name, size = 'md', src }) {
   const initial = String(name || '?').trim().charAt(0).toUpperCase();
   // Stable colour per name, so a person keeps the same avatar everywhere.
   const tone = AVATAR_TONES[
     String(name || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_TONES.length
   ];
   const dims = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs';
+
+  // A photo that 404s falls back to the initials rather than a broken image.
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
+    return (
+      <img
+        src={src}
+        alt={name || ''}
+        onError={() => setFailed(true)}
+        className={`${dims} rounded-full object-cover shrink-0 bg-ink-800`}
+      />
+    );
+  }
+
   return (
     <span className={`${dims} ${tone} rounded-full inline-flex items-center justify-center font-semibold shrink-0`}>
       {initial}

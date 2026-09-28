@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api.js';
-import { PageHeader, Skeleton, ErrorBox, useToast, money } from '../components/ui.jsx';
+import { PageHeader, Skeleton, ErrorBox, useToast, money, Avatar } from '../components/ui.jsx';
 
 /**
  * What the business made, and what it spent.
@@ -183,6 +183,206 @@ function CostForm({ categories, onSaved, onError, notify }) {
   );
 }
 
+/**
+ * Find a nanny by typing her name.
+ *
+ * A dropdown of every nanny stops being usable at about thirty, and the
+ * person raising a payment already knows who they mean.
+ */
+function NannyPicker({ value, onPick, disabled }) {
+  const [q, setQ] = useState('');
+  const [hits, setHits] = useState([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (q.trim().length < 2) { setHits([]); return undefined; }
+    // Debounced: a request per keystroke would be one per letter of a name.
+    const t = setTimeout(() => {
+      api(`/payouts/nanny-search?q=${encodeURIComponent(q)}`)
+        .then((r) => { setHits(r.nannies || []); setOpen(true); })
+        .catch(() => setHits([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  if (value) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5">
+        <Avatar name={value.name} src={value.photoUrl} size="sm" />
+        <span className="flex-1 truncate text-sm text-slate-200">{value.name}</span>
+        <button
+          type="button" className="btn-ghost text-xs"
+          onClick={() => { onPick(null); setQ(''); }}
+          disabled={disabled}
+        >
+          Change
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <input
+        type="text" className="input" placeholder="Type a name or phone…"
+        value={q} disabled={disabled}
+        onChange={(e) => setQ(e.target.value)}
+        onFocus={() => hits.length && setOpen(true)}
+      />
+      {open && hits.length > 0 && (
+        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-ink-700 bg-ink-900 py-1 shadow-2xl">
+          {hits.map((n) => (
+            <li key={n.id}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-ink-800"
+                onClick={() => { onPick(n); setOpen(false); }}
+              >
+                <Avatar name={n.name} src={n.photoUrl} size="sm" />
+                <span className="text-slate-200">{n.name}</span>
+                <span className="font-mono text-xs text-slate-500">{n.phone}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {q.trim().length >= 2 && hits.length === 0 && (
+        <p className="mt-1 text-xs text-slate-500">No nanny matches that.</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Pay a nanny part of her wages before her salary date.
+ *
+ * Not a cost and not a bonus — it comes back off the salary it was drawn
+ * against, and stays visible against her name until it does. Proof of the
+ * transfer is required: this is money leaving with no booking behind it.
+ */
+function AdvanceForm({ onSaved, onError, notify }) {
+  const [nanny, setNanny] = useState(null);
+  const [form, setForm] = useState({ amount: '', reason: '', note: '', recoverFrom: '' });
+  const [proofUrl, setProofUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const upload = (file) => {
+    if (!file) return;
+    setBusy(true);
+    const reader = new FileReader();
+    reader.onerror = () => { onError('The file could not be read'); setBusy(false); };
+    reader.onload = () => {
+      const ext = (file.name.match(/\.[a-z0-9]+$/i)?.[0] || '.jpg').toLowerCase();
+      api('/payouts/proof-upload', {
+        method: 'POST',
+        body: { data: String(reader.result).split(',')[1], ext },
+      })
+        .then((r) => { setProofUrl(r.url); notify('Proof attached'); })
+        .catch((e) => onError(e.message))
+        .finally(() => setBusy(false));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!nanny) return onError('Choose a nanny first');
+    if (!proofUrl) return onError('Please attach a photo showing the transfer');
+    setBusy(true);
+    return api('/payouts/advance', {
+      method: 'POST',
+      body: { ...form, nannyId: nanny.id, amount: Number(form.amount), proofUrl },
+    })
+      .then(() => {
+        notify('Advance recorded');
+        setNanny(null);
+        setForm({ amount: '', reason: '', note: '', recoverFrom: '' });
+        setProofUrl('');
+        onSaved();
+      })
+      .catch((err) => onError(err.message))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <form onSubmit={submit} className="card space-y-4 p-5">
+      <div>
+        <h3 className="text-sm font-medium text-white">Pay before her salary date</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Her own wages, early. It comes off the salary it was drawn against,
+          and stays outstanding against her name until it clears. The reason
+          and the photo are cleared once the month closes — the amount and
+          date stay.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Nanny</span>
+          <NannyPicker value={nanny} onPick={setNanny} disabled={busy} />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Amount</span>
+          <input
+            type="number" min="0" step="1000" className="input font-mono" required
+            placeholder="0" value={form.amount}
+            onChange={(e) => set('amount', e.target.value)}
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Take it off</span>
+          <input
+            type="month" className="input"
+            value={form.recoverFrom}
+            onChange={(e) => set('recoverFrom', e.target.value)}
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-500">Proof of transfer</span>
+          {proofUrl ? (
+            <div className="flex items-center gap-2 pt-1.5">
+              <span className="text-sm text-emerald-400">Attached</span>
+              <button type="button" className="btn-ghost text-xs" onClick={() => setProofUrl('')}>
+                Replace
+              </button>
+            </div>
+          ) : (
+            <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-ink-700 px-3 py-2.5 text-xs text-slate-400 hover:border-ink-600">
+              <input
+                type="file" className="hidden" accept=".jpg,.jpeg,.png,.webp,.pdf"
+                disabled={busy}
+                onChange={(e) => upload(e.target.files?.[0])}
+              />
+              {busy ? 'Uploading…' : 'Attach a photo'}
+            </label>
+          )}
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="mb-1 block text-xs text-slate-500">Why is she being paid early?</span>
+        <input
+          type="text" className="input" required
+          placeholder="Family emergency, school fees, medical bill…"
+          value={form.reason}
+          onChange={(e) => set('reason', e.target.value)}
+        />
+      </label>
+
+      <div className="flex justify-end">
+        <button type="submit" className="btn-primary" disabled={busy}>
+          {busy ? 'Saving…' : 'Record advance'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /* ------------------------------------------------------------------ *
  * Special payouts
  * ------------------------------------------------------------------ */
@@ -337,6 +537,7 @@ const TABS = [
   { key: 'nannies', label: 'By nanny' },
   { key: 'payouts', label: 'Payments to nannies' },
   { key: 'costs', label: 'Costs' },
+  { key: 'forecast', label: 'Next 10 days' },
 ];
 
 export default function Finance() {
@@ -345,6 +546,7 @@ export default function Finance() {
   const [tab, setTab] = useState('overview');
   const [data, setData] = useState(null);
   const [costs, setCosts] = useState(null);
+  const [forecast, setForecast] = useState(null);
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -352,11 +554,17 @@ export default function Finance() {
   const load = () => {
     setLoading(true);
     const q = `?from=${range.from}&to=${range.to}`;
-    Promise.all([api(`/finance${q}`), api(`/costs${q}`), api('/auth/me').catch(() => null)])
-      .then(([f, c, who]) => {
+    Promise.all([
+      api(`/finance${q}`),
+      api(`/costs${q}`),
+      api('/auth/me').catch(() => null),
+      api('/payouts/forecast?days=10').catch(() => null),
+    ])
+      .then(([f, c, who, fc]) => {
         setData(f);
         setCosts(c);
         setMe(who?.admin || who || null);
+        setForecast(fc);
         setError(null);
       })
       .catch((e) => setError(e.message))
@@ -552,6 +760,13 @@ export default function Finance() {
           {tab === 'payouts' && (
             <>
               {canEdit && (
+                <AdvanceForm
+                  notify={notify}
+                  onError={toastError}
+                  onSaved={load}
+                />
+              )}
+              {canEdit && (
                 <SpecialPayoutForm
                   nannies={data.byNanny}
                   notify={notify}
@@ -559,6 +774,43 @@ export default function Finance() {
                   onSaved={load}
                 />
               )}
+              {forecast?.advances?.total > 0 && (
+                <div className="card border-l-4 border-amber-500/70 p-4">
+                  <div className="font-medium text-amber-300">
+                    {money(forecast.advances.total)} paid early and not yet recovered
+                  </div>
+                  <p className="mt-1 text-sm text-slate-400">
+                    This comes off the salaries it was drawn against. Until it
+                    does, it is money out of the business.
+                  </p>
+                  <ul className="mt-3 space-y-3 text-sm">
+                    {forecast.advances.byNanny.map((a) => (
+                      <li key={a.nannyId}>
+                        <div className="flex items-center gap-2">
+                          <Avatar name={a.name} src={a.profilePhotoUrl} size="sm" />
+                          <span className="flex-1 text-slate-300">{a.name}</span>
+                          <span className="font-mono text-amber-400">{money(a.outstanding)}</span>
+                        </div>
+                        <ul className="mt-1 space-y-0.5 pl-8">
+                          {(a.items || []).map((it) => (
+                            <li key={it.id} className="flex justify-between gap-3 text-xs">
+                              <span className={it.redactedAt ? 'italic text-slate-600' : 'text-slate-500'}>
+                                {it.redactedAt
+                                  ? 'reason cleared at month end'
+                                  : it.reason}
+                              </span>
+                              <span className="shrink-0 font-mono text-slate-500">
+                                {money(it.amount)} · off {it.recoverFrom}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <Stat label="Paid out" value={money(data.payouts.paid)} tone="green" />
                 <Stat
@@ -570,7 +822,16 @@ export default function Finance() {
                 empty="No payouts in this period."
                 rows={data.payouts.byNanny.map((r) => ({ ...r, _key: r.nannyId }))}
                 columns={[
-                  { key: 'name', label: 'Nanny' },
+                  {
+                    key: 'name',
+                    label: 'Nanny',
+                    render: (r) => (
+                      <span className="flex items-center gap-2">
+                        <Avatar name={r.name} src={r.profilePhotoUrl} size="sm" />
+                        {r.name}
+                      </span>
+                    ),
+                  },
                   { key: 'count', label: 'Payouts', right: true },
                   {
                     key: 'paid',
@@ -589,6 +850,72 @@ export default function Finance() {
                 ]}
               />
             </>
+          )}
+
+          {tab === 'forecast' && (
+            forecast ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Stat
+                    label="Due in 10 days" value={money(forecast.net)}
+                    hint={`${forecast.from} to ${forecast.to}`}
+                  />
+                  <Stat
+                    label="Heaviest day"
+                    value={forecast.peak?.net ? money(forecast.peak.net) : '—'}
+                    tone="amber"
+                    hint={forecast.peak?.net
+                      ? `${forecast.peak.weekday} ${forecast.peak.date}`
+                      : 'Nothing scheduled'}
+                  />
+                  <Stat
+                    label="Already advanced" value={money(forecast.advances?.total || 0)}
+                    tone="red"
+                    hint="Paid early, still to come off a salary"
+                  />
+                </div>
+
+                {/* Every day is listed, including the quiet ones: a gap in a
+                    forecast reads as missing data, a zero reads as nothing due. */}
+                <Table
+                  empty="Nothing scheduled in the next ten days."
+                  rows={forecast.rows.map((r) => ({ ...r, _key: r.date }))}
+                  columns={[
+                    {
+                      key: 'date',
+                      label: 'Date',
+                      render: (r) => (
+                        <span>
+                          <span className="text-slate-300">{r.weekday}</span>{' '}
+                          <span className="font-mono text-xs text-slate-500">{r.date}</span>
+                        </span>
+                      ),
+                    },
+                    {
+                      key: 'nannies',
+                      label: 'Who',
+                      render: (r) => (r.nannies.length
+                        ? <span className="text-slate-400">{r.nannies.join(', ')}</span>
+                        : <span className="text-slate-600">—</span>),
+                    },
+                    { key: 'count', label: 'Payouts', right: true },
+                    {
+                      key: 'net',
+                      label: 'Due',
+                      right: true,
+                      className: 'font-semibold',
+                      render: (r) => (r.net > 0
+                        ? <span className="text-emerald-400">{money(r.net)}</span>
+                        : <span className="text-slate-600">—</span>),
+                    },
+                  ]}
+                />
+              </>
+            ) : (
+              <div className="card p-10 text-center text-sm text-slate-500">
+                The forecast could not be loaded.
+              </div>
+            )
           )}
 
           {tab === 'costs' && (

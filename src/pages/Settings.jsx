@@ -100,6 +100,7 @@ function TeamPanel({ admin }) {
             onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
           >
             <option value="support">Support — read and reply, no money actions</option>
+            <option value="finance">Finance — revenue, costs and payments to nannies only</option>
             <option value="admin">Admin — approve payments and bookings</option>
             <option value="super_admin">Super admin — everything, including accounts</option>
           </select>
