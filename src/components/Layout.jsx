@@ -35,6 +35,7 @@ const NAV = [
   { to: '/activity', label: 'Activity Log', Icon: IconSupport },
   { to: '/social', label: 'Follow & Save', Icon: IconReferrals },
   { to: '/notes', label: 'Notes', Icon: IconSupport },
+  { to: '/backups', label: 'Backups', Icon: IconSettings },
   { to: '/settings', label: 'Settings', Icon: IconSettings },
 ];
 

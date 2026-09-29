@@ -15,6 +15,7 @@ import Social from './pages/Social.jsx';
 import Areas from './pages/Areas.jsx';
 import MediaQueue from './pages/MediaQueue.jsx';
 import Settings from './pages/Settings.jsx';
+import Backups from './pages/Backups.jsx';
 import Pricing from './pages/Pricing.jsx';
 import Earnings from './pages/Earnings.jsx';
 import Contracts from './pages/Contracts.jsx';
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="social" element={<Social />} />
           <Route path="areas" element={<Areas />} />
           <Route path="media-queue" element={<MediaQueue />} />
+          <Route path="backups" element={<Backups admin={admin} />} />
           <Route path="settings" element={<Settings admin={admin} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
