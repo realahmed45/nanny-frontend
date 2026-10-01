@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import api, { mediaUrl } from '../lib/api.js';
+import api from '../lib/api.js';
+import { MediaImg, MediaLink } from '../components/PrivateMedia.jsx';
 import {
   PageHeader, Table, Badge, Tabs, StatCard, Pagination, Modal, Field,
   useToast, ErrorBox, money, date, dateTime, humanize,
@@ -178,7 +179,30 @@ export default function Payments() {
       render: (p) => <span className="font-mono text-xs">{p.booking?.bookingNumber ? `#${p.booking.bookingNumber}` : '—'}</span>,
     },
     { key: 'nanny', header: 'Nanny', render: (p) => p.nanny?.fullName || '—' },
-    { key: 'amount', header: 'Amount', render: (p) => <span className="font-mono text-xs">{money(p.amount)}</span> },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (p) => (
+        <div>
+          <span className="font-mono text-xs">{money(p.amount)}</span>
+          {/* Why this payout is smaller than her day's pay: the family paid
+              her overtime in person and our commission on it came off here. */}
+          {/* Advances come off when the payout is released, so the amount
+              above is already what to transfer. */}
+          {p.advanceRecovered > 0 && (
+            <p className="text-[11px] text-slate-500">
+              after {money(p.advanceRecovered)} advance taken off
+            </p>
+          )}
+          {p.overtime?.commissionDeducted > 0 && (
+            <p className="text-[11px] text-slate-500">
+              after {money(p.overtime.commissionDeducted)} overtime commission
+              {p.overtime.stillOwed > 0 ? ` · ${money(p.overtime.stillOwed)} still owed` : ''}
+            </p>
+          )}
+        </div>
+      ),
+    },
     {
       key: 'scheduled', header: 'Scheduled For',
       render: (p) => <span className="font-mono text-xs">{date(p.scheduledFor)}</span>,
@@ -338,26 +362,24 @@ export default function Payments() {
                 <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
                   Transfer receipt
                 </p>
-                <a href={mediaUrl(selected.proof.url)} target="_blank" rel="noreferrer" className="block">
-                  <img
-                    src={mediaUrl(selected.proof.url)}
+                <MediaLink url={selected.proof.url} className="block">
+                  <MediaImg
+                    url={selected.proof.url}
                     alt="Transfer receipt"
                     className="max-h-80 rounded-lg border border-ink-700 bg-ink-950"
                   />
-                </a>
+                </MediaLink>
                 {selected.proof.note && (
                   <p className="text-sm text-slate-400 mt-2">
                     Family wrote: “{selected.proof.note}”
                   </p>
                 )}
-                <a
-                  href={mediaUrl(selected.proof.url)}
-                  target="_blank"
-                  rel="noreferrer"
+                <MediaLink
+                  url={selected.proof.url}
                   className="text-xs text-brand-400 hover:text-brand-300 mt-1 inline-block"
                 >
                   Open full size
-                </a>
+                </MediaLink>
               </div>
             )}
 
@@ -366,13 +388,13 @@ export default function Payments() {
                 <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 mb-2">
                   Refund receipt
                 </p>
-                <a href={mediaUrl(selected.refundProof.url)} target="_blank" rel="noreferrer">
-                  <img
-                    src={mediaUrl(selected.refundProof.url)}
+                <MediaLink url={selected.refundProof.url}>
+                  <MediaImg
+                    url={selected.refundProof.url}
                     alt="Refund receipt"
                     className="max-h-64 rounded-lg border border-ink-700"
                   />
-                </a>
+                </MediaLink>
               </div>
             )}
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import api, { mediaUrl } from '../lib/api.js';
+import api from '../lib/api.js';
+import { MediaLink } from '../components/PrivateMedia.jsx';
 import Notes from '../components/Notes.jsx';
 import PersonCalendar from '../components/PersonCalendar.jsx';
 import ReferralsTab from '../components/ReferralsTab.jsx';
@@ -481,15 +482,13 @@ function NannyDetail({ nanny, extra, onBooking }) {
         <Field label="Documents">
           <div className="flex flex-wrap gap-2">
             {nanny.documents.map((d, i) => (
-              <a
+              <MediaLink
                 key={i}
-                href={mediaUrl(d.url)}
-                target="_blank"
-                rel="noreferrer"
+                url={d.url}
                 className="px-2 py-1 rounded bg-ink-800 text-xs text-brand-400 hover:text-brand-300"
               >
                 {humanize(d.type)}
-              </a>
+              </MediaLink>
             ))}
           </div>
         </Field>

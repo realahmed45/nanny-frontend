@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '../lib/api.js';
+import api, { setToken } from '../lib/api.js';
 import {
   PageHeader, Field, Badge, Skeleton, ErrorBox, useToast, dateTime, money,
 } from '../components/ui.jsx';
@@ -46,6 +46,23 @@ function TeamPanel({ admin }) {
     }
   };
 
+  const setActive = async (a, active) => {
+    if (!window.confirm(active ? `Switch ${a.email} back on?` : `Switch off ${a.email}? They are signed out at once.`)) return;
+    try {
+      await api(`/admins/${a._id}`, { method: 'PATCH', body: { active } });
+      load();
+    } catch (err) { setError(err.message); }
+  };
+
+  const resetPassword = async (a) => {
+    const pw = window.prompt(`New password for ${a.email} (at least 10 characters):`);
+    if (!pw) return;
+    try {
+      await api(`/admins/${a._id}`, { method: 'PATCH', body: { password: pw } });
+      window.alert('Password changed. They have been signed out everywhere.');
+    } catch (err) { setError(err.message); }
+  };
+
   if (!isSuper) {
     return (
       <p className="text-xs text-slate-500">
@@ -73,6 +90,16 @@ function TeamPanel({ admin }) {
               <Badge value={a.active ? 'active' : 'suspended'} />
               <div className="text-xs text-slate-500 w-40 text-right">
                 {a.lastLoginAt ? `last in ${dateTime(a.lastLoginAt)}` : 'never signed in'}
+              </div>
+              <div className="flex gap-2">
+                <button type="button" className="btn-ghost text-xs" onClick={() => resetPassword(a)}>
+                  Reset password
+                </button>
+                {String(a._id) !== String(admin?.id || admin?._id) && (
+                  <button type="button" className="btn-ghost text-xs" onClick={() => setActive(a, !a.active)}>
+                    {a.active ? 'Switch off' : 'Switch on'}
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -111,6 +138,49 @@ function TeamPanel({ admin }) {
         </button>
       </form>
     </div>
+  );
+}
+
+/** Change your own password. Every other sign-in of yours stops working. */
+function ChangePassword() {
+  const [form, setForm] = useState({ currentPassword: '', newPassword: '' });
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await api('/admins/me/password', { method: 'POST', body: form });
+      if (r.token) setToken(r.token);
+      setForm({ currentPassword: '', newPassword: '' });
+      setMsg({ ok: true, text: 'Password changed. You have been signed out everywhere else.' });
+    } catch (err) {
+      setMsg({ ok: false, text: err.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-3 border-t border-ink-800 pt-4 mt-4">
+      <p className="text-xs text-slate-500">Change your password</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <input
+          className="input" type="password" placeholder="Current password" required
+          value={form.currentPassword}
+          onChange={(e) => setForm((f) => ({ ...f, currentPassword: e.target.value }))}
+        />
+        <input
+          className="input" type="password" placeholder="New password (10+ characters)" required minLength={10}
+          value={form.newPassword}
+          onChange={(e) => setForm((f) => ({ ...f, newPassword: e.target.value }))}
+        />
+      </div>
+      {msg && <p className={`text-xs ${msg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{msg.text}</p>}
+      <button className="btn-primary text-xs" disabled={busy}>{busy ? 'Saving…' : 'Change password'}</button>
+    </form>
   );
 }
 
@@ -730,6 +800,7 @@ export default function Settings({ admin }) {
             <Field label="Email"><span className="font-mono text-xs">{admin?.email}</span></Field>
             <Field label="Role"><Badge value={admin?.role} /></Field>
           </div>
+          <ChangePassword />
         </Panel>
 
         <Panel title="Team & Access">

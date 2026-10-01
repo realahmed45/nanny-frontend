@@ -75,7 +75,8 @@ export default function Bookings() {
   const [broadcasting, setBroadcasting] = useState(false);
 
   const cancel = async () => {
-    if (!window.confirm('Cancel this booking and apply the refund policy?')) return;
+    const figure = refund ? ` The family will be refunded ${money(refund.totalRefund)}.` : '';
+    if (!window.confirm(`Cancel this booking and apply the refund policy?${figure}`)) return;
     try {
       await api(`/bookings/${selected._id}/cancel`, {
         method: 'POST',
@@ -385,9 +386,17 @@ function BookingDetail({ booking, extra, refund }) {
             Refund preview (if cancelled now)
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-            <div><span className="text-slate-500">Refund</span><p className="font-mono">{money(refund.refund)}</p></div>
-            <div><span className="text-slate-500">Penalty</span><p className="font-mono">{money(refund.penalty)}</p></div>
-            <div><span className="text-slate-500">Band</span><p className="text-xs">{refund.band || '—'}</p></div>
+            {/* The server sends totalRefund / totalNannyCompensation and a band
+                per day. This read `refund`, `penalty` and `band`, which it never
+                sends, so every cancellation previewed as Rp 0. */}
+            <div><span className="text-slate-500">Refund to family</span><p className="font-mono">{money(refund.totalRefund)}</p></div>
+            <div><span className="text-slate-500">Nanny compensation</span><p className="font-mono">{money(refund.totalNannyCompensation)}</p></div>
+            <div>
+              <span className="text-slate-500">Band</span>
+              <p className="text-xs">
+                {[...new Set((refund.perDay || []).map((d) => d.band).filter(Boolean))].join(', ') || '—'}
+              </p>
+            </div>
           </div>
         </div>
       )}

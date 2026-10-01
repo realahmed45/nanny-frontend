@@ -668,6 +668,13 @@ export default function Finance() {
                     tone={t.netProfit >= 0 ? 'green' : 'red'}
                   />
                 </dl>
+                {t.overtimeCollectedByNannies > 0 && (
+                  <p className="mt-3 border-t border-white/5 pt-3 text-xs text-slate-500">
+                    Includes {money(t.overtimeCollectedByNannies)} of overtime that families paid
+                    to nannies in person. Our commission on it,{' '}
+                    {money(t.overtimeCommission)}, is taken off the nannies&apos; payouts.
+                  </p>
+                )}
               </div>
 
               <div className="card p-5">

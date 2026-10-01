@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import api, { mediaUrl } from '../lib/api.js';
+import api from '../lib/api.js';
+import { MediaLink } from '../components/PrivateMedia.jsx';
 import { PageHeader, Skeleton, ErrorBox, useToast, money } from '../components/ui.jsx';
 
 /**
@@ -262,12 +263,12 @@ function EditPanel({ nannyId, onClose, onSaved }) {
         <span className="block text-xs text-slate-500 mb-1">Signed contract</span>
         {form.documentUrl ? (
           <div className="flex items-center gap-3 rounded-lg border border-ink-700 bg-ink-900 p-3">
-            <a
-              href={mediaUrl(form.documentUrl)} target="_blank" rel="noreferrer"
+            <MediaLink
+              url={form.documentUrl}
               className="text-sm text-brand-400 hover:underline truncate"
             >
               View signed contract
-            </a>
+            </MediaLink>
             <span className="text-xs text-slate-500 whitespace-nowrap">
               {form.documentUploadedAt ? new Date(form.documentUploadedAt).toLocaleDateString() : ''}
             </span>
